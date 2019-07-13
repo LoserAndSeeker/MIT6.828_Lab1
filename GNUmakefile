@@ -67,7 +67,10 @@ endif
 GDBPORT	:= $(shell expr `id -u` % 5000 + 25000)
 
 CC	:= $(GCCPREFIX)gcc -pipe
+
 GDB	:= $(GCCPREFIX)gdb
+
+
 AS	:= $(GCCPREFIX)as
 AR	:= $(GCCPREFIX)ar
 LD	:= $(GCCPREFIX)ld
@@ -149,7 +152,11 @@ QEMUOPTS += $(QEMUEXTRA)
 	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > $@
 
 gdb:
+
 	$(GDB) -n -x .gdbinit
+
+	gdb -n -x .gdbinit
+
 
 pre-qemu: .gdbinit
 
