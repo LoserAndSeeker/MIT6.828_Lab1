@@ -132,8 +132,8 @@ mem_init(void)
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
-	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
-	memset(kern_pgdir, 0, PGSIZE);
+	kern_pgdir = (pde_t *) boot_alloc(PGSIZE); //传回一个虚拟地址
+	memset(kern_pgdir, 0, PGSIZE);//memset第一个参数要的就是虚拟地址
 
 	//////////////////////////////////////////////////////////////////////
 	// Recursively insert PD in itself as a page table, to form
@@ -142,8 +142,9 @@ mem_init(void)
 	// following line.)
 
 	// Permissions: kernel R, user R
-	kern_pgdir[PDX(UVPT)] = PADDR(kern_pgdir) | PTE_U | PTE_P;
-
+	
+	//将虚拟地址对应的物理地址(PADDR=kern_pgdir-KERNBASE)插入页目录表
+	kern_pgdir[PDX(UVPT)] = PADDR(kern_pgdir) | PTE_U | PTE_P; 
 	//////////////////////////////////////////////////////////////////////
 	// Allocate an array of npages 'struct PageInfo's and store it in 'pages'.
 	// The kernel uses this array to keep track of physical pages: for
@@ -157,6 +158,12 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	envs = (struct Env *)boot_alloc(NENV * sizeof(struct Env));
+	memset(envs, 0, NENV * sizeof(struct Env));
+
+	//在这之上都是用boot_alloc()分配虚拟内存，然后memset初始化对应的物理页
+	//在虚拟空间内的位置都是紧挨在end之后的。因为nextfree是递增的
+	//在这往下就正式用page_alloc了，boot_alloc就不能再用
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -169,6 +176,10 @@ mem_init(void)
 	check_page_free_list(1);
 	check_page_alloc();
 	check_page();
+
+	//之前三个boot_alloc只是页表机制没开启所以通过-KERNBASE来初始化物理页，没建立映射。
+	//等这些物理页在页表中建好映射后，这些物理页对应上了虚拟内存中真正的虚拟地址，
+	//那之前那个+KERNBASE的虚拟地址就废了，在虚拟地址空间中不再有意义，因为mmu只懂分页
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -188,7 +199,7 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
-
+	boot_map_region(kern_pgdir, UENVS, PTSIZE, PADDR(envs), PTE_U|PTE_P);
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -471,6 +482,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	
 	*pte = PTE_ADDR(page2pa(pp)) | perm | PTE_P; 
 	//pp->pp_ref++; why this code has to be up there?
+	//因为pp本来就可能是va对应的物理页，那么很可能被page_remove给free掉
 		
 	return 0;
 	
@@ -568,8 +580,20 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-
+	//自己写出的代码也差不多，不知道为什么最多只能拿75，只好照着大神的改了下
+	pte_t *pte;
+	uint32_t start = (uint32_t)ROUNDDOWN(va, PGSIZE);//因为va跟va+len都没对齐的
+	uint32_t end = (uint32_t)ROUNDUP(va+len, PGSIZE);
+	for(uint32_t i=start; i<end; i+=PGSIZE){
+		pte = pgdir_walk(env->env_pgdir, (void *)i, 0);
+		//确实这里考虑不了这么周全
+		if ((i >= ULIM) || !pte || !(*pte & PTE_P) || ((*pte & perm) != perm)){
+			user_mem_check_addr = (i < (uintptr_t)va? (uintptr_t)va : i);
+			return -E_FAULT;
+		}
+	}
 	return 0;
+
 }
 
 //

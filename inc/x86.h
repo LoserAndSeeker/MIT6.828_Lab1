@@ -197,7 +197,7 @@ static inline uint32_t
 read_eflags(void)
 {
 	uint32_t eflags;
-	asm volatile("pushfl; popl %0" : "=r" (eflags));
+	asm volatile("pushfl; popl %0" : "=r" (eflags)); //pushfl 将标志寄存器FR(flag register)入栈
 	return eflags;
 }
 

@@ -24,7 +24,7 @@
 	.globl name;		/* define global symbol for 'name' */	\
 	.type name, @function;	/* symbol type is function */		\
 	.align 2;		/* align function definition */		\
-	name:			/* function starts here */		\
+	name:			/* function starts here ，我傻了把，这么大一个冒号看不见?这里不就是函数内容嘛！！！*/		\
 	pushl $(num);							\
 	jmp _alltraps
 
@@ -45,11 +45,51 @@
 
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
+ * interrupt vector 8、10、11、12、13、14 have error code
  */
+TRAPHANDLER_NOEC(divide_handler, T_DIVIDE);
+TRAPHANDLER_NOEC(debug_handler, T_DEBUG);
+TRAPHANDLER_NOEC(nmi_handler, T_NMI);
+TRAPHANDLER_NOEC(brkpt_handler, T_BRKPT);
+TRAPHANDLER_NOEC(oflow_handler, T_OFLOW);
+TRAPHANDLER_NOEC(bound_handler, T_BOUND);
+TRAPHANDLER_NOEC(illop_handler, T_ILLOP);
+TRAPHANDLER_NOEC(device_handler, T_DEVICE);
+
+TRAPHANDLER(dblflt_handler, T_DBLFLT);
+TRAPHANDLER(tss_handler, T_TSS);
+TRAPHANDLER(segnp_handler, T_SEGNP);
+TRAPHANDLER(stack_handler, T_STACK);
+TRAPHANDLER(gpflt_handler, T_GPFLT);
+TRAPHANDLER(pgflt_handler, T_PGFLT);
+
+TRAPHANDLER_NOEC(fperr_handler, T_FPERR);
+TRAPHANDLER_NOEC(align_handler, T_ALIGN);
+TRAPHANDLER_NOEC(mchk_handler, T_MCHK);
+TRAPHANDLER_NOEC(simderr_handler, T_SIMDERR);
+TRAPHANDLER_NOEC(syscall_handler, T_SYSCALL);
 
 
 
 /*
  * Lab 3: Your code here for _alltraps
  */
+_alltraps:
+		# make the stack look like a struct Trapframe
+		pushl	%ds
+		pushl 	%es
+		pushal
+
+		# load GD_KD into %ds and %es
+		# 段寄存器用途见https://zhidao.baidu.com/question/455369927.html
+		movl 	$GD_KD, %eax
+		movl 	%eax, %ds
+		movl 	%eax, %es
+
+		# push %esp as an argument to trap()
+		pushl 	%esp 
+
+		call 	trap
+
+		
 

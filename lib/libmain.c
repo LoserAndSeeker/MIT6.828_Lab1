@@ -13,7 +13,13 @@ libmain(int argc, char **argv)
 {
 	// set thisenv to point at our Env structure in envs[].
 	// LAB 3: Your code here.
-	thisenv = 0;
+	
+	//这个地方一定要看懂envid_t的结构，用ENVX()取后10bit做索引值就行
+	//也要注意这里有kern/syscall.c文件与lib/syscall.c
+	//kern/syscall.c是在内核态下调用的，本身在内核态，所以不包括系统调用
+	//lib/syscall.c是在用户态下调用的，想让内核帮忙，就得系统调用
+	//根据头文件判断这里调用的是lib/syscall.c，根据这里是用户程序，也可以判断是lib/syscall.c
+	thisenv = &envs[ENVX(sys_getenvid())];
 
 	// save the name of the program so that panic() can use it
 	if (argc > 0)
