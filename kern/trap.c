@@ -63,7 +63,8 @@ void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
-
+	//：它通过传递第二个参数值为 1 来指定这是一个陷阱门。
+	//陷阱门不会清除 IF 位，这使得在处理系统调用的时候也接受其他中断。
 	// LAB 3: Your code here.
 	SETGATE(idt[T_DIVIDE], 1, GD_KT, divide_handler, 0);
 	SETGATE(idt[T_DEBUG], 1, GD_KT, debug_handler, 0);
@@ -83,7 +84,7 @@ trap_init(void)
 	SETGATE(idt[T_ALIGN], 0, GD_KT, align_handler, 0);
 	SETGATE(idt[T_MCHK], 0, GD_KT, mchk_handler, 0);
 	SETGATE(idt[T_SIMDERR], 0, GD_KT, simderr_handler, 0);
-	SETGATE(idt[T_SYSCALL], 0, GD_KT, syscall_handler, 3);
+	SETGATE(idt[T_SYSCALL], 1, GD_KT, syscall_handler, 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
