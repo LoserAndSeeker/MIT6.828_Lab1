@@ -11,7 +11,7 @@
 
 // The big kernel lock
 struct spinlock kernel_lock = {
-#ifdef DEBUG_SPINLOCK
+#ifdef DEBUG_SPINLOCK	//如果宏定义了DEBUG_SPINLOCK，就执行中间的程序
 	.name = "kernel_lock"
 #endif
 };

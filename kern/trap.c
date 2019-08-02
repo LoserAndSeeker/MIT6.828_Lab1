@@ -70,8 +70,28 @@ void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
-
+	//：它通过传递第二个参数值为 1 来指定这是一个陷阱门。
+	//陷阱门不会清除 IF 位，这使得在处理系统调用的时候也接受其他中断。
 	// LAB 3: Your code here.
+	SETGATE(idt[T_DIVIDE], 1, GD_KT, divide_handler, 0);
+	SETGATE(idt[T_DEBUG], 1, GD_KT, debug_handler, 0);
+	SETGATE(idt[T_NMI], 0, GD_KT, nmi_handler, 0);
+	SETGATE(idt[T_BRKPT], 1, GD_KT, brkpt_handler, 3);
+	SETGATE(idt[T_OFLOW], 1, GD_KT, oflow_handler, 0);
+	SETGATE(idt[T_BOUND], 1, GD_KT, bound_handler, 0);
+	SETGATE(idt[T_ILLOP], 1, GD_KT, illop_handler, 0);
+	SETGATE(idt[T_DEVICE], 1, GD_KT, device_handler, 0);
+	SETGATE(idt[T_DBLFLT], 1, GD_KT, dblflt_handler, 0);
+	SETGATE(idt[T_TSS], 1, GD_KT, tss_handler, 0);
+	SETGATE(idt[T_SEGNP], 1, GD_KT, segnp_handler, 0);
+	SETGATE(idt[T_STACK], 1, GD_KT, stack_handler, 0);
+	SETGATE(idt[T_GPFLT], 1, GD_KT, gpflt_handler, 0);
+	SETGATE(idt[T_PGFLT], 1, GD_KT, pgflt_handler, 0);
+	SETGATE(idt[T_FPERR], 1, GD_KT, fperr_handler, 0);
+	SETGATE(idt[T_ALIGN], 0, GD_KT, align_handler, 0);
+	SETGATE(idt[T_MCHK], 0, GD_KT, mchk_handler, 0);
+	SETGATE(idt[T_SIMDERR], 0, GD_KT, simderr_handler, 0);
+	SETGATE(idt[T_SYSCALL], 1, GD_KT, syscall_handler, 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -108,19 +128,22 @@ trap_init_percpu(void)
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
-	ts.ts_esp0 = KSTACKTOP;
-	ts.ts_ss0 = GD_KD;
-	ts.ts_iomb = sizeof(struct Taskstate);
-
+	int i = cpunum();
+	//thiscpu->cpu_ts.ts_esp0 = (uintptr_t)(&percpu_kstacks[i]); //这明明是物理地址+KERNBASE，怎么就可以指向KSTACKTOP区域了?
+	thiscpu->cpu_ts.ts_esp0 = KSTACKTOP - i*(KSTKSIZE + KSTKGAP);
+	thiscpu->cpu_ts.ts_ss0 = GD_KD;
+	thiscpu->cpu_ts.ts_iomb = sizeof(struct Taskstate);//防止未经授权的环境执行IO(0不是正确的值!)
+	
 	// Initialize the TSS slot of the gdt.
-	gdt[GD_TSS0 >> 3] = SEG16(STS_T32A, (uint32_t) (&ts),
+	// 为什么这里还藏着一个ts啊，啊啊啊啊!
+	gdt[(GD_TSS0 >> 3) + i] = SEG16(STS_T32A, (uint32_t) (&thiscpu->cpu_ts),
 					sizeof(struct Taskstate) - 1, 0);
-	gdt[GD_TSS0 >> 3].sd_s = 0;
+	gdt[(GD_TSS0 >> 3) + i].sd_s = 0;
 
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
-	ltr(GD_TSS0);
-
+	ltr(GD_TSS0 + (i<<3)); //最后3bits是特殊的，举一反三
+	
 	// Load the IDT
 	lidt(&idt_pd);
 }
@@ -177,6 +200,7 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
 
+
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
 	// IRQ line or other reasons. We don't care.
@@ -190,20 +214,36 @@ trap_dispatch(struct Trapframe *tf)
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
 
-	// Unexpected trap: The user process or the kernel has a bug.
-	print_trapframe(tf);
-	if (tf->tf_cs == GD_KT)
-		panic("unhandled trap in kernel");
-	else {
-		env_destroy(curenv);
-		return;
+
+	//cprintf("  trap 0x%08x %s\n", tf->tf_trapno, trapname(tf->tf_trapno));
+	if(tf->tf_trapno == T_PGFLT)
+		page_fault_handler(tf);
+	else if(tf->tf_trapno == T_BRKPT)
+		monitor(tf);
+	//AX, DX, CX, BX, DI, SI里面存的是系统调用参数
+	//print_regs(&tf->tf_regs);
+	else if(tf->tf_trapno == T_SYSCALL){
+		int32_t result = syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx, tf->tf_regs.reg_ecx, 
+			tf->tf_regs.reg_ebx,tf->tf_regs.reg_edi,tf->tf_regs.reg_esi);
+		tf->tf_regs.reg_eax = result;
 	}
+	// Unexpected trap: The user process or the kernel has a bug.
+	else{
+		print_trapframe(tf);
+		if (tf->tf_cs == GD_KT)
+			panic("unhandled trap in kernel");
+		else {
+			env_destroy(curenv);
+			return;
+		}
+	}
+	
 }
 
 void
 trap(struct Trapframe *tf)
 {
-	// The environment may have set DF and some versions
+	// The environment may have set DF(方向标志位) and some versions
 	// of GCC rely on DF being clear
 	asm volatile("cld" ::: "cc");
 
@@ -219,13 +259,14 @@ trap(struct Trapframe *tf)
 	// Check that interrupts are disabled.  If this assertion
 	// fails, DO NOT be tempted to fix it by inserting a "cli" in
 	// the interrupt path.
-	assert(!(read_eflags() & FL_IF));
+	assert(!(read_eflags() & FL_IF)); //此时的栈是内核栈？？？
 
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
 		// LAB 4: Your code here.
+		lock_kernel();
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie
@@ -241,6 +282,9 @@ trap(struct Trapframe *tf)
 		curenv->env_tf = *tf;
 		// The trapframe on the stack should be ignored from here on.
 		tf = &curenv->env_tf;
+		//这个操作是很重要的，让tf由栈指向了curenv->env_tf。
+		//这样的话，恢复现场的时候就会根据tf来恢复，也就是会恢复当前进程继续执行
+		//tf的概念很重要，是陷入进来的程序的栈帧
 	}
 
 	// Record that tf is the last real trapframe so
@@ -249,7 +293,8 @@ trap(struct Trapframe *tf)
 
 	// Dispatch based on what type of trap occurred
 	trap_dispatch(tf);
-
+	//cprintf("cpu:%d env:%08x",cpunum(),curenv->env_id);
+	
 	// If we made it to this point, then no other environment was
 	// scheduled, so we should return to the current environment
 	// if doing so makes sense.
@@ -271,9 +316,24 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
+	if((tf->tf_cs & 3)==0)
+		panic("a page fault happened in kernel mode!\n");
+	/*if((tf->tf_cs & 3)==0)
+	{//我居然想着内核页面错误了就插一个页面继续运行。傻了，kernel mode下根本不能页面错误，会terminate
+		struct PageInfo *pp=page_alloc(0);
+		if(!pp)
+			panic("out of memory");
+		page_insert(kern_pgdir,pp,(void *)fault_va,PTE_U|PTE_W);
+	}else
+		panic("a page fault happened in kernel mode!\n");*/
 
+	
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
+	// 为什么？？因为这是用户程序hello调用lib/cprintf()里的系统调用lib/sys_cputs陷入的
+	// 如果页面错误发生在kernel mode，那就会产生triple fault，在上面panic了
+	// 因为内核绝不能发生页面错误
+
 
 	// Call the environment's page fault upcall, if one exists.  Set up a
 	// page fault stack frame on the user exception stack (below
@@ -305,6 +365,9 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+
+
+	//用户程序发生页面错误就得直接destroy掉吗？
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",

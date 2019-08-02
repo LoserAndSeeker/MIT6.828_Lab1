@@ -9,9 +9,11 @@ breakpoint(void)
 	asm volatile("int3");
 }
 
+
 static inline uint8_t
 inb(int port)
 {
+	//读端口用IN指令，写端口用OUT指令
 	uint8_t data;
 	asm volatile("inb %w1,%0" : "=a" (data) : "d" (port));
 	return data;
@@ -63,7 +65,8 @@ insl(int port, void *addr, int cnt)
 static inline void
 outb(int port, uint8_t data)
 {
-	asm volatile("outb %0,%w1" : : "a" (data), "d" (port));
+	//读端口用IN指令，写端口用OUT指令
+	asm volatile("outb %0,%w1" : : "a" (data), "d" (port)); //向端口port写入数据data？
 }
 
 static inline void
@@ -197,7 +200,7 @@ static inline uint32_t
 read_eflags(void)
 {
 	uint32_t eflags;
-	asm volatile("pushfl; popl %0" : "=r" (eflags));
+	asm volatile("pushfl; popl %0" : "=r" (eflags)); //pushfl 将标志寄存器FR(flag register)入栈
 	return eflags;
 }
 
@@ -254,10 +257,11 @@ xchg(volatile uint32_t *addr, uint32_t newval)
 	uint32_t result;
 
 	// The + in "+m" denotes a read-modify-write operand.
+	//xchg 交换两个操作数的内容
 	asm volatile("lock; xchgl %0, %1"
 		     : "+m" (*addr), "=a" (result)
 		     : "1" (newval)
-		     : "cc");
+		     : "cc"); //condition code register
 	return result;
 }
 

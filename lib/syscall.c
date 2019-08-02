@@ -16,9 +16,9 @@ syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// this instruction away just because we don't use the
 	// return value.
 	//
-	// The last clause tells the assembler that this can
+	// The last clause（子句） tells the assembler that this can
 	// potentially change the condition codes and arbitrary
-	// memory locations.
+	// memory locations（任意内存位置）.
 
 	asm volatile("int %1\n"
 		     : "=a" (ret)

@@ -22,7 +22,7 @@ sys_cputs(const char *s, size_t len)
 	// Destroy the environment if not.
 
 	// LAB 3: Your code here.
-
+	user_mem_assert(curenv, s, len, PTE_U);
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
 }
@@ -67,7 +67,9 @@ sys_env_destroy(envid_t envid)
 static void
 sys_yield(void)
 {
+	//cprintf("cpu:%d env:%08x",cpunum(),cpus[cpunum()].cpu_env->env_id);
 	sched_yield();
+	
 }
 
 // Allocate a new environment.
@@ -79,12 +81,22 @@ sys_exofork(void)
 {
 	// Create the new environment with env_alloc(), from kern/env.c.
 	// It should be left as env_alloc created it, except that
-	// status is set to ENV_NOT_RUNNABLE, and the register set is copied
-	// from the current environment -- but tweaked so sys_exofork
+	// status is set to ENV_NOT_RUNNABLE,(它应该保留为创建它时的env_alloc，除了状态设置为ENV_NOT_RUNNABLE)
+	// and the register set is copied
+	// from the current environment -- but tweaked(调整) so sys_exofork
 	// will appear to return 0.
+	struct Env *e;
+	int r = env_alloc(&e, curenv->env_id);
+	if(r != 0)
+		return r;
+	e->env_status = ENV_NOT_RUNNABLE;
+	memcpy(&e->env_tf,&curenv->env_tf,sizeof(e->env_tf));
 
+	// 子环境的返回值为0，这个我确实知道，但是怎么也想不到得这么写，卡了好久
+	e->env_tf.tf_regs.reg_eax = 0;
+	return e->env_id;
 	// LAB 4: Your code here.
-	panic("sys_exofork not implemented");
+	//panic("sys_exofork not implemented");
 }
 
 // Set envid's env_status to status, which must be ENV_RUNNABLE
@@ -102,7 +114,15 @@ sys_env_set_status(envid_t envid, int status)
 	// You should set envid2env's third argument to 1, which will
 	// check whether the current environment has permission to set
 	// envid's status.
-
+	struct Env *e;
+	//什么叫envid不存在？就是envid2env返回-E_BAD_ENV时说明它不存在
+	int r  =envid2env(envid, &e, 1);
+	if(r != 0)
+		return r;
+	if(e->env_status != ENV_RUNNABLE && e->env_status != ENV_NOT_RUNNABLE)
+		return -E_INVAL;
+	e->env_status = status;
+	return 0;
 	// LAB 4: Your code here.
 	panic("sys_env_set_status not implemented");
 }
@@ -141,13 +161,45 @@ sys_env_set_pgfault_upcall(envid_t envid, void *func)
 static int
 sys_page_alloc(envid_t envid, void *va, int perm)
 {
-	// Hint: This function is a wrapper around page_alloc() and
+	// Hint: This function is a wrapper(包装) around page_alloc() and
 	//   page_insert() from kern/pmap.c.
 	//   Most of the new code you write should be to check the
 	//   parameters for correctness.
 	//   If page_insert() fails, remember to free the page you
 	//   allocated!
 
+	//envid doesn't currently exist
+	struct Env *e;
+	int r  = envid2env(envid, &e, 1);
+	//cprintf("envid:%d\n",envid);
+	if(r != 0) 
+		return r;
+
+	//va >= UTOP, or va is not page-aligned
+	if((uintptr_t)va % PGSIZE !=0 || (uintptr_t)va >= UTOP)
+		return -E_INVAL;
+
+	//PTE_U | PTE_P must be set
+	if((perm & (PTE_U | PTE_P)) ==0)
+		return -E_INVAL;
+
+	//PTE_AVAIL | PTE_W may or may not be set, but no other bits may be set
+	if( perm & ~PTE_SYSCALL )
+		return -E_INVAL;
+
+	//there's no memory to allocate the new page, or to allocate any necessary page tables
+	struct PageInfo *pp;
+	pp = page_alloc(1); //设为1可以初始化页面内容为0。
+	if(!pp)
+		return -E_NO_MEM;
+
+	//If page_insert() fails, remember to free the page
+	r = page_insert(e->env_pgdir, pp, va, perm);
+	if(r != 0){
+		page_free(pp);
+		return r;
+	}
+	return 0;
 	// LAB 4: Your code here.
 	panic("sys_page_alloc not implemented");
 }
@@ -178,7 +230,41 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	//   parameters for correctness.
 	//   Use the third argument to page_lookup() to
 	//   check the current permissions on the page.
+	
+	//envid doesn't currently exist
+	struct Env *srce, *dste;
+	int src  =envid2env(srcenvid, &srce, 1);
+	if(src != 0) 
+		return src;
+	int dst  =envid2env(dstenvid, &dste, 1);
+	if(dst != 0) 
+		return dst;
 
+	//va >= UTOP, or va is not page-aligned
+	if((uintptr_t)srcva % PGSIZE !=0 || (uintptr_t)srcva >= UTOP)
+		return -E_INVAL;
+	if((uintptr_t)dstva % PGSIZE !=0 || (uintptr_t)dstva >= UTOP)
+		return -E_INVAL;
+
+	//PTE_U | PTE_P must be set
+	if((perm & (PTE_U | PTE_P)) ==0)
+		return -E_INVAL;
+
+	//PTE_AVAIL | PTE_W may or may not be set, but no other bits may be set
+	if( perm  & ~PTE_SYSCALL )
+		return -E_INVAL;
+
+	//if (perm & PTE_W), but srcva is read-only
+	struct PageInfo *srcpp;
+	pte_t *srcpte;
+	srcpp = page_lookup(srce->env_pgdir, srcva, &srcpte);
+	if(((*srcpte & PTE_W) == 0) && (perm & PTE_W) )
+		return -E_INVAL;
+
+	int r = page_insert(dste->env_pgdir, srcpp, dstva, perm);
+	if(r != 0)
+		return r;
+	return 0;
 	// LAB 4: Your code here.
 	panic("sys_page_map not implemented");
 }
@@ -194,7 +280,17 @@ static int
 sys_page_unmap(envid_t envid, void *va)
 {
 	// Hint: This function is a wrapper around page_remove().
+	struct Env *e;
+	int r  =envid2env(envid, &e, 1);
+	if(r != 0) 
+		return r;
 
+	//va >= UTOP, or va is not page-aligned
+	if((uintptr_t)va % PGSIZE !=0 || (uintptr_t)va >= UTOP)
+		return -E_INVAL;
+
+	page_remove(e->env_pgdir, va);
+	return 0;
 	// LAB 4: Your code here.
 	panic("sys_page_unmap not implemented");
 }
@@ -270,12 +366,37 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
 	// LAB 3: Your code here.
-
-	panic("syscall not implemented");
-
+	
+	//panic("syscall not implemented");
+	
 	switch (syscallno) {
-	default:
-		return -E_INVAL;
+		case (SYS_cputs):
+			//实在不懂这里的参数。EDI与ESI才是指向要处理内存的吧
+			//好吧我傻了，在lib/syscall.c的sys_cputs()那里已经告诉我了。。。
+			sys_cputs((const char *)a1, a2);
+			return 0;
+		case (SYS_cgetc): 
+			return sys_cgetc();
+		case (SYS_getenvid):
+			return sys_getenvid();
+		case (SYS_env_destroy): 
+			//这个在lib/syscall.c/sys_env_destroy()也有提示...
+			return sys_env_destroy(a1);
+		case (SYS_yield):
+			sys_yield();
+			return 0;
+		case (SYS_exofork):
+			return sys_exofork();
+		case (SYS_env_set_status):
+			return sys_env_set_status(a1,a2);
+		case (SYS_page_alloc):
+			return sys_page_alloc(a1, (void *)a2, a3);
+		case (SYS_page_map):
+			return sys_page_map(a1,(void *)a2,a3,(void *)a4,a5);
+		case (SYS_page_unmap):
+			return sys_page_unmap(a1,(void *)a2);
+		default:
+			return -E_INVAL;
 	}
 }
 

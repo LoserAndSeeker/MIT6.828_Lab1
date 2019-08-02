@@ -12,11 +12,11 @@
  */
 
 // Global descriptor numbers
-#define GD_KT     0x08     // kernel text
-#define GD_KD     0x10     // kernel data
-#define GD_UT     0x18     // user text
-#define GD_UD     0x20     // user data
-#define GD_TSS0   0x28     // Task segment selector for CPU 0
+#define GD_KT     0x08     // Global descriptor_kernel text:GD_KT  1 = 0x08 >> 3
+#define GD_KD     0x10     // kernel data						   2 = 0x10 >> 3
+#define GD_UT     0x18     // user text							   3
+#define GD_UD     0x20     // user data							   4
+#define GD_TSS0   0x28     // Task segment selector for CPU 0	   5
 
 /*
  * Virtual memory map:                                Permissions
@@ -146,6 +146,7 @@
 typedef uint32_t pte_t;
 typedef uint32_t pde_t;
 
+
 #if JOS_USER
 /*
  * The page directory entry corresponding to the virtual address range
@@ -186,6 +187,7 @@ struct PageInfo {
 
 	uint16_t pp_ref;
 };
+
 
 #endif /* !__ASSEMBLER__ */
 #endif /* !JOS_INC_MEMLAYOUT_H */
