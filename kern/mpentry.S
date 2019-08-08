@@ -78,7 +78,7 @@ start32:
 	movl    %eax, %cr0
 
 	# Switch to the per-cpu stack allocated in boot_aps()
-	movl    mpentry_kstack, %esp    #为什么每次都是从mpentry_kstack开始？
+	movl    mpentry_kstack, %esp    #为什么每次都是从mpentry_kstack开始？因为mp_main()中每一次mpentry_kstack都赋了新值
 	movl    $0x0, %ebp       # nuke frame pointer
 
 	# Call mp_main().  (Exercise for the reader: why the indirect call?)

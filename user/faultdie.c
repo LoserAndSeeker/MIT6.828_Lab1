@@ -14,6 +14,8 @@ handler(struct UTrapframe *utf)
 void
 umain(int argc, char **argv)
 {
-	set_pgfault_handler(handler);
-	*(int*)0xDeadBeef = 0;
+	set_pgfault_handler(handler); //设好handler跟_pgfault_upcall
+	//cprintf("0xDeadBeef:%08x\n",0xDeadBeef);
+	*(int*)0xDeadBeef = 0; // 0xDeadBeef这个地址没分配过物理页，会产生page fault
+	
 }

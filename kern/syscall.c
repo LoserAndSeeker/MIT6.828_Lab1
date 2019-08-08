@@ -139,6 +139,13 @@ static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
 	// LAB 4: Your code here.
+	struct Env *e;
+	//什么叫envid不存在？就是envid2env返回-E_BAD_ENV时说明它不存在
+	int r  =envid2env(envid, &e, 1);
+	if(r != 0)
+		return r;
+	e->env_pgfault_upcall = func;
+	return 0;
 	panic("sys_env_set_pgfault_upcall not implemented");
 }
 
@@ -189,7 +196,7 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 
 	//there's no memory to allocate the new page, or to allocate any necessary page tables
 	struct PageInfo *pp;
-	pp = page_alloc(1); //设为1可以初始化页面内容为0。
+	pp = page_alloc(1); //参数为1就是初始化页面内容为0。
 	if(!pp)
 		return -E_NO_MEM;
 
@@ -395,6 +402,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_page_map(a1,(void *)a2,a3,(void *)a4,a5);
 		case (SYS_page_unmap):
 			return sys_page_unmap(a1,(void *)a2);
+		case (SYS_env_set_pgfault_upcall):
+			return sys_env_set_pgfault_upcall(a1,(void *)a2);
 		default:
 			return -E_INVAL;
 	}

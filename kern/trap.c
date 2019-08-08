@@ -362,17 +362,52 @@ page_fault_handler(struct Trapframe *tf)
 	// Hints:
 	//   user_mem_assert() and env_run() are useful here.
 	//   To change what the user environment runs, modify 'curenv->env_tf'
-	//   (the 'tf' variable points at 'curenv->env_tf').
+	//   (the 'tf' variable points at 'curenv->env_tf' 这是因为trap()+20那里的操作).
 
 	// LAB 4: Your code here.
+	struct UTrapframe *utf;
+	//uintptr_t uxEsp=UXSTACKTOP-1;
+	if(curenv->env_pgfault_upcall != NULL){
+		//发生异常时，用户环境已经在用户异常堆栈上运行，应该在当前tf->tf_esp下启动新的堆栈帧
+		//您应该首先推送一个空的32位word，然后是struct UTrapframe
+		if(tf->tf_esp<=UXSTACKTOP-1 && tf->tf_esp >=UXSTACKTOP-PGSIZE) 
+			utf = (struct UTrapframe *)(tf->tf_esp - sizeof(struct UTrapframe) -4);
+		else //否则，应该在UXSTACKTOP启动新的堆栈帧
+			utf = (struct UTrapframe *)(UXSTACKTOP - sizeof(struct UTrapframe));
 
+		// 检查是否the exception stack overflows
+		user_mem_assert(curenv, (const void *)utf, sizeof(struct UTrapframe), PTE_W);
 
-	//用户程序发生页面错误就得直接destroy掉吗？
+		// Set up a page fault stack frame on the user exception stack 
+		utf->utf_fault_va = fault_va;
+		utf->utf_err = tf->tf_trapno; //要区分tf_trapno与tf_err
+		utf->utf_regs = tf->tf_regs;
+		utf->utf_eflags = tf->tf_eflags;
+		utf->utf_eip = tf->tf_eip;
+		utf->utf_esp = tf->tf_esp; 	
+
+		//这里我就确实有点想不到
+		tf->tf_esp = (uintptr_t)utf;
+
+		//branch to curenv->env_pgfault_upcall
+		tf->tf_eip = (uintptr_t)curenv->env_pgfault_upcall;
+		env_run(curenv);
+	
+		
+	}
+	
+	//用户程序发生页面错误就得直接destroy掉吗？在lab4才开始处理
 
 	// Destroy the environment that caused the fault.
-	cprintf("[%08x] user fault va %08x ip %08x\n",
-		curenv->env_id, fault_va, tf->tf_eip);
-	print_trapframe(tf);
-	env_destroy(curenv);
+	
+	else{
+		cprintf("[%08x] user fault va %08x ip %08x\n",
+			curenv->env_id, fault_va, tf->tf_eip);
+		print_trapframe(tf);
+		env_destroy(curenv);
+	}
+	
+	
+	
 }
 

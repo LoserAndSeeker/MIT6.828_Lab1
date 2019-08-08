@@ -60,7 +60,7 @@ i386_init(void)
 
 	// Lab 4 multitasking initialization functions
 	pic_init();
-
+	//cprintf("curcpu:%d\n",cpunum());
 	// Acquire the big kernel lock before waking up APs
 	// Your code here:
 	lock_kernel();
@@ -116,8 +116,8 @@ boot_aps(void)
 	//结果是mpentry_start:f0105144, mpentry_end:f01051be
 	
 	// Write entry code to unused memory at MPENTRY_PADDR
-	code = KADDR(MPENTRY_PADDR);
-	memmove(code, mpentry_start, mpentry_end - mpentry_start);
+	code = KADDR(MPENTRY_PADDR); //memmove的参数得是虚拟地址
+	memmove(code, mpentry_start, mpentry_end - mpentry_start); 
 
 	// Boot each AP one at a time
 	for (c = cpus; c < cpus + ncpu; c++) {
@@ -126,6 +126,8 @@ boot_aps(void)
 
 		// Tell mpentry.S what stack to use 
 		mpentry_kstack = percpu_kstacks[c - cpus] + KSTKSIZE; //因为栈向下增长？
+		//cprintf("percpu_kstacks:%08x\n",percpu_kstacks[c - cpus]);
+		cprintf("mpentry_kstack:%08x\n",mpentry_kstack);
 		// Start the CPU at mpentry_start
 		lapic_startap(c->cpu_id, PADDR(code));  //STARTUP
 		// Wait for the CPU to finish some basic setup in mp_main()
