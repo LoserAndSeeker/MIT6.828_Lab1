@@ -110,7 +110,12 @@ void simderr_handler();
 void syscall_handler();
 
 
-
+void irq_error_handler();
+void irq_kbd_handler();
+void irq_ide_handler();
+void irq_timer_handler();
+void irq_spurious_handler();
+void irq_serial_handler();
 
 
 

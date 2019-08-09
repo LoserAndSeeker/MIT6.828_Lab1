@@ -319,7 +319,7 @@ sys_page_unmap(envid_t envid, void *va)
 //    env_ipc_perm is set to 'perm' if a page was transferred, 0 otherwise.
 // The target environment is marked runnable again, returning 0
 // from the paused sys_ipc_recv system call.  (Hint: does the
-// sys_ipc_recv function ever actually return?)
+// sys_ipc_recv function ever actually return?sys_ipc_recv函数是否实际返回?)
 //
 // If the sender wants to send a page but the receiver isn't asking for one,
 // then no page mapping is transferred, but no error occurs.
@@ -344,7 +344,61 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
+	int r ; 
+	struct Env *e;
+	pte_t *pte;
+	struct PageInfo *srcpp;
+	//cprintf("curenv:%08x send to:%08x\n",curenv->env_id,envid);
+	r=envid2env(envid, &e, 0);
+	if(r<0)
+		return r;
+	e->env_ipc_perm=0;
+	if(!e->env_ipc_recving || e->env_ipc_from)
+		return -E_IPC_NOT_RECV;
+	
+	if((uintptr_t)srcva <UTOP){
+		
+		if((uintptr_t)srcva%PGSIZE)
+			return -E_INVAL;
+		//PTE_U | PTE_P must be set
+		if((perm & (PTE_U | PTE_P)) ==0)
+			return -E_INVAL;
+
+		//PTE_AVAIL | PTE_W may or may not be set, but no other bits may be set
+		if( perm & ~PTE_SYSCALL )
+			return -E_INVAL;
+
+		//-E_INVAL if srcva < UTOP but srcva is not mapped in the caller's address space.
+		srcpp=page_lookup(curenv->env_pgdir, srcva, &pte);
+		if(srcpp==NULL)
+			return -E_INVAL;
+		
+		if(!pte || ((perm & PTE_W)&&(*pte & 0x800)))
+			return -E_INVAL;
+		
+		//if there's not enough memory to map srcva in envid's address space.
+		//r=sys_page_map(curenv->env_id, srcva, envid, e->env_ipc_dstva, perm);为什么这个不行
+		//虽然我知道sys_page_map里最后就是page_insert，前面的检查也与这里上面大多重复了
+		//但是还是不明白为什么会报错bad environment，envid都是合理的呀
+		r=page_insert(e->env_pgdir, srcpp, e->env_ipc_dstva, perm);
+		if(r<0){
+			return r;
+		}
+		e->env_ipc_perm=perm;
+	}
+
+	e->env_ipc_recving=0;
+	e->env_ipc_from=curenv->env_id;
+	e->env_ipc_value=value;
+	// The target environment is marked runnable again, returning 0
+	e->env_status = ENV_RUNNABLE;
+	//不加这个就报错[00001001] user panic in <unknown> at lib/syscall.c:35: syscall 12 returned 12 (> 0)
+	//因为sys_ipc_recv如果成功是没有返回值的，当运行到这里，可以证明receiver已经接收到了，帮他返回0
+	e->env_tf.tf_regs.reg_eax=0;
+	return 0;
 	panic("sys_ipc_try_send not implemented");
+
+
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -362,8 +416,33 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
-	return 0;
+	
+	
+	if((uintptr_t)dstva<UTOP){
+		if((uintptr_t)dstva%PGSIZE)
+			return -E_INVAL;
+		
+	}
+	// Block until a value is ready？？
+	curenv->env_ipc_dstva=dstva;
+	curenv->env_ipc_from = 0; //证明现在还没有收到任何信息
+	curenv->env_ipc_recving=1; //1-block, 0-unblock
+	// mark yourself not runnable, and then give up the CPU.
+	curenv->env_status = ENV_NOT_RUNNABLE;
+	// This function only returns on error, but the system call will eventually
+	// return 0 on success.
+	// 也就是说如果成功了，syscall()是不会有返回值的，
+	//而又需要%eax返回0证明成功了，就需要sys_ipc_try_send来设置其%eax
+	/*if(curenv->env_ipc_value){ 
+		//不需要自己unblock，sys_ipc_try_send成功会把这设0的
+		//不然会在pingpong测试里卡住，卡在get 2 就不动了
+		curenv->env_ipc_recving=0;
+	}*/
+	sched_yield();
+	
+	/*panic("sys_ipc_recv not implemented");
+	return 0;*/
+
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
@@ -404,6 +483,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_page_unmap(a1,(void *)a2);
 		case (SYS_env_set_pgfault_upcall):
 			return sys_env_set_pgfault_upcall(a1,(void *)a2);
+		case (SYS_ipc_recv):
+			return sys_ipc_recv((void *)a1);
+		case (SYS_ipc_try_send):
+			return sys_ipc_try_send(a1, a2, (void *)a3, a4);
 		default:
 			return -E_INVAL;
 	}

@@ -273,9 +273,11 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_tf.tf_esp = USTACKTOP;
 	e->env_tf.tf_cs = GD_UT | 3;
 	// You will set e->env_tf.tf_eip later.
+	//如果是env_create，那再load_icode里set。如果是fork的，那直接复制整个父进程的env_tf
 
 	// Enable interrupts while in user mode.
 	// LAB 4: Your code here.
+	e->env_tf.tf_eflags |= FL_IF;
 
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
@@ -316,7 +318,6 @@ region_alloc(struct Env *e, void *va, size_t len)
 			panic("fail to alloc page!\n");
 		if(page_insert(e->env_pgdir, p, i, PTE_U|PTE_W)!=0) //map the page to virtual address
 			panic("fail to region_alloc!\n");
-
 
 	}
 	

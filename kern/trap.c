@@ -73,26 +73,34 @@ trap_init(void)
 	//：它通过传递第二个参数值为 1 来指定这是一个陷阱门。
 	//陷阱门不会清除 IF 位，这使得在处理系统调用的时候也接受其他中断。
 	// LAB 3: Your code here.
-	SETGATE(idt[T_DIVIDE], 1, GD_KT, divide_handler, 0);
-	SETGATE(idt[T_DEBUG], 1, GD_KT, debug_handler, 0);
+	SETGATE(idt[T_DIVIDE], 0, GD_KT, divide_handler, 0);
+	SETGATE(idt[T_DEBUG], 0, GD_KT, debug_handler, 0);
 	SETGATE(idt[T_NMI], 0, GD_KT, nmi_handler, 0);
-	SETGATE(idt[T_BRKPT], 1, GD_KT, brkpt_handler, 3);
-	SETGATE(idt[T_OFLOW], 1, GD_KT, oflow_handler, 0);
-	SETGATE(idt[T_BOUND], 1, GD_KT, bound_handler, 0);
-	SETGATE(idt[T_ILLOP], 1, GD_KT, illop_handler, 0);
-	SETGATE(idt[T_DEVICE], 1, GD_KT, device_handler, 0);
-	SETGATE(idt[T_DBLFLT], 1, GD_KT, dblflt_handler, 0);
-	SETGATE(idt[T_TSS], 1, GD_KT, tss_handler, 0);
-	SETGATE(idt[T_SEGNP], 1, GD_KT, segnp_handler, 0);
-	SETGATE(idt[T_STACK], 1, GD_KT, stack_handler, 0);
-	SETGATE(idt[T_GPFLT], 1, GD_KT, gpflt_handler, 0);
-	SETGATE(idt[T_PGFLT], 1, GD_KT, pgflt_handler, 0);
-	SETGATE(idt[T_FPERR], 1, GD_KT, fperr_handler, 0);
+	SETGATE(idt[T_BRKPT], 0, GD_KT, brkpt_handler, 3);
+	SETGATE(idt[T_OFLOW], 0, GD_KT, oflow_handler, 0);
+	SETGATE(idt[T_BOUND], 0, GD_KT, bound_handler, 0);
+	SETGATE(idt[T_ILLOP], 0, GD_KT, illop_handler, 0);
+	SETGATE(idt[T_DEVICE], 0, GD_KT, device_handler, 0);
+	SETGATE(idt[T_DBLFLT], 0, GD_KT, dblflt_handler, 0);
+	SETGATE(idt[T_TSS], 0, GD_KT, tss_handler, 0);
+	SETGATE(idt[T_SEGNP], 0, GD_KT, segnp_handler, 0);
+	SETGATE(idt[T_STACK], 0, GD_KT, stack_handler, 0);
+	SETGATE(idt[T_GPFLT], 0, GD_KT, gpflt_handler, 0);
+	SETGATE(idt[T_PGFLT], 0, GD_KT, pgflt_handler, 0);
+	SETGATE(idt[T_FPERR], 0, GD_KT, fperr_handler, 0);
 	SETGATE(idt[T_ALIGN], 0, GD_KT, align_handler, 0);
 	SETGATE(idt[T_MCHK], 0, GD_KT, mchk_handler, 0);
 	SETGATE(idt[T_SIMDERR], 0, GD_KT, simderr_handler, 0);
-	SETGATE(idt[T_SYSCALL], 1, GD_KT, syscall_handler, 3);
+	SETGATE(idt[T_SYSCALL], 0, GD_KT, syscall_handler, 3);
 
+	//在inc/trap.h中给出了哪几种Hardware IRQ numbers.
+	//外部设备中断在内核中总是禁用的(和xv6一样，在用户空间中启用)
+	SETGATE(idt[IRQ_OFFSET+IRQ_ERROR], 0, GD_KT, irq_error_handler, 3);
+	SETGATE(idt[IRQ_OFFSET+IRQ_IDE], 0, GD_KT, irq_ide_handler, 3);
+	SETGATE(idt[IRQ_OFFSET+IRQ_KBD], 0, GD_KT, irq_kbd_handler, 3);
+	SETGATE(idt[IRQ_OFFSET+IRQ_SERIAL], 0, GD_KT, irq_serial_handler, 3);
+	SETGATE(idt[IRQ_OFFSET+IRQ_SPURIOUS], 0, GD_KT, irq_spurious_handler, 3); //spurious假的，伪造的
+	SETGATE(idt[IRQ_OFFSET+IRQ_TIMER], 0, GD_KT, irq_timer_handler, 3);
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -209,12 +217,15 @@ trap_dispatch(struct Trapframe *tf)
 		print_trapframe(tf);
 		return;
 	}
-
+	
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
-
-
+	else if(tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER){
+		lapic_eoi(); //??承认中断？这个是真想不到
+		sched_yield();
+		return;
+	}
 	//cprintf("  trap 0x%08x %s\n", tf->tf_trapno, trapname(tf->tf_trapno));
 	if(tf->tf_trapno == T_PGFLT)
 		page_fault_handler(tf);
