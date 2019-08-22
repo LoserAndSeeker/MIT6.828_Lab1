@@ -12,11 +12,11 @@
  */
 
 // Global descriptor numbers
-#define GD_KT     0x08     // kernel text
-#define GD_KD     0x10     // kernel data
-#define GD_UT     0x18     // user text
-#define GD_UD     0x20     // user data
-#define GD_TSS0   0x28     // Task segment selector for CPU 0
+#define GD_KT     0x08     // Global descriptor_kernel text:GD_KT  1 = 0x08 >> 3
+#define GD_KD     0x10     // kernel data						   2 = 0x10 >> 3
+#define GD_UT     0x18     // user text							   3
+#define GD_UD     0x20     // user data							   4
+#define GD_TSS0   0x28     // Task segment selector for CPU 0	   5
 
 /*
  * Virtual memory map:                                Permissions
@@ -146,20 +146,22 @@
 typedef uint32_t pte_t;
 typedef uint32_t pde_t;
 
+
 #if JOS_USER
 /*
  * The page directory entry corresponding to the virtual address range
  * [UVPT, UVPT + PTSIZE) points to the page directory itself.  Thus, the page
  * directory is treated as a page table as well as a page directory.
+ * 页目录既被视为页表，也被视为页目录。
  *
  * One result of treating the page directory as a page table is that all PTEs
  * can be accessed through a "virtual page table" at virtual address UVPT (to
  * which uvpt is set in lib/entry.S).  The PTE for page number N is stored in
  * uvpt[N].  (It's worth drawing a diagram of this!)
  *
- * A second consequence is that the contents of the current page directory
+ * A second consequence(结果) is that the contents of the current page directory
  * will always be available at virtual address (UVPT + (UVPT >> PGSHIFT)), to
- * which uvpd is set in lib/entry.S.
+ * which uvpd is set in lib/entry.S.当前页面目录的内容总是在虚拟地址(UVPT + (UVPT >> PGSHIFT))处可用?
  */
 extern volatile pte_t uvpt[];     // VA of "virtual page table"
 extern volatile pde_t uvpd[];     // VA of current page directory
@@ -186,6 +188,7 @@ struct PageInfo {
 
 	uint16_t pp_ref;
 };
+
 
 #endif /* !__ASSEMBLER__ */
 #endif /* !JOS_INC_MEMLAYOUT_H */

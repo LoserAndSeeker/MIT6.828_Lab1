@@ -20,14 +20,14 @@ unsigned char percpu_kstacks[NCPU][KSTKSIZE]
 __attribute__ ((aligned(PGSIZE)));
 
 
-// See MultiProcessor Specification Version 1.[14]
+// See MultiProcessor Specification Version 1.[14]   多处理器规范版本1.[14]
 
 struct mp {             // floating pointer [MP 4.1]
-	uint8_t signature[4];           // "_MP_"
+	uint8_t signature[4];           // "_MP_"  (signature:署名，签名，信号)
 	physaddr_t physaddr;            // phys addr of MP config table
 	uint8_t length;                 // 1
 	uint8_t specrev;                // [14]
-	uint8_t checksum;               // all bytes must add up to 0
+	uint8_t checksum;               // all bytes must add up to 0 所有字节之和必须为0 ？？？
 	uint8_t type;                   // MP system config type
 	uint8_t imcrp;
 	uint8_t reserved[3];
@@ -37,7 +37,7 @@ struct mpconf {         // configuration table header [MP 4.2]
 	uint8_t signature[4];           // "PCMP"
 	uint16_t length;                // total table length
 	uint8_t version;                // [14]
-	uint8_t checksum;               // all bytes must add up to 0
+	uint8_t checksum;               // all bytes must add up to 0 校验和
 	uint8_t product[20];            // product id
 	physaddr_t oemtable;            // OEM table pointer
 	uint16_t oemlength;             // OEM table length
@@ -69,6 +69,7 @@ struct mpproc {         // processor table entry [MP 4.3.1]
 #define MPIOINTR  0x03  // One per bus interrupt source
 #define MPLINTR   0x04  // One per system interrupt source
 
+// 应该就是把从[addr，addr+len)内每个字节(1字节8bit)的内容加起来
 static uint8_t
 sum(void *addr, int len)
 {
@@ -81,6 +82,7 @@ sum(void *addr, int len)
 }
 
 // Look for an MP structure in the len bytes at physical address addr.
+// 从物理地址a开始的len字节中找到一个MP结构体，返回其起始地址
 static struct mp *
 mpsearch1(physaddr_t a, int len)
 {
@@ -112,23 +114,27 @@ mpsearch(void)
 
 	// [MP 4] The 16-bit segment of the EBDA is in the two bytes
 	// starting at byte 0x0E of the BDA.  0 if not present.
-	if ((p = *(uint16_t *) (bda + 0x0E))) {
-		p <<= 4;	// Translate from segment to PA
-		if ((mp = mpsearch1(p, 1024)))
+	// EBDA的16位段在BDA的字节0x0E处开始的两个字节内的那个内容。0如果不存在。
+	if ((p = *(uint16_t *) (bda + 0x0E))) {//即取的是地址0x40E中的内容
+		p <<= 4;	// Translate from segment to PA 左移4位就变成物理地址了？
+		//cprintf("EBDA:%08x\n",p);  可以得到 p=0x0009fc00;并且p+1K=640K(0x000A0000)
+		if ((mp = mpsearch1(p, 1024))) //BDA的开始KB。赋值语句，返回左值
 			return mp;
 	} else {
 		// The size of base memory, in KB is in the two bytes
 		// starting at 0x13 of the BDA.
+		// 从BDA的0x13开始的两个字节
 		p = *(uint16_t *) (bda + 0x13) * 1024;
-		if ((mp = mpsearch1(p - 1024, 1024)))
+		if ((mp = mpsearch1(p - 1024, 1024))) //BDA的末端KB。
 			return mp;
 	}
-	return mpsearch1(0xF0000, 0x10000);
+	return mpsearch1(0xF0000, 0x10000); //这里不应是0xE0000吗
 }
 
 // Search for an MP configuration table.  For now, don't accept the
 // default configurations (physaddr == 0).
 // Check for the correct signature, checksum, and version.
+// 找到MP configuration table 和 MP，然后检查是否有效
 static struct mpconf *
 mpconfig(struct mp **pmp)
 {
@@ -141,7 +147,12 @@ mpconfig(struct mp **pmp)
 		cprintf("SMP: Default configurations not implemented\n");
 		return NULL;
 	}
+	// 根据mp找到MP config table
 	conf = (struct mpconf *) KADDR(mp->physaddr);
+	
+	//cprintf("conf:%08x mp:%08x mp->physaddr:%08x\n",conf,mp,mp->physaddr); 
+	//结果是conf:f00f64b0 mp:f00f64a0 mp->physaddr:000f64b0
+	
 	if (memcmp(conf, "PCMP", 4) != 0) {
 		cprintf("SMP: Incorrect MP configuration table signature\n");
 		return NULL;
@@ -176,7 +187,8 @@ mp_init(void)
 		return;
 	ismp = 1;
 	lapicaddr = conf->lapicaddr;
-
+	//cprintf("lapicaddr:%08x\n",lapicaddr); 结果是lapicaddr:0xfee00000
+	//cprintf("conf->entries:%08x\n",conf->entries); 结果是conf->entries:f00f64dc
 	for (p = conf->entries, i = 0; i < conf->entry; i++) {
 		switch (*p) {
 		case MPPROC:
@@ -218,6 +230,7 @@ mp_init(void)
 	if (mp->imcrp) {
 		// [MP 3.2.6.1] If the hardware implements PIC mode,
 		// switch to getting interrupts from the LAPIC.
+		// 如果硬件实现PIC模式，切换到从LAPIC获取中断。
 		cprintf("SMP: Setting IMCR to switch from PIC mode to symmetric I/O mode\n");
 		outb(0x22, 0x70);   // Select IMCR
 		outb(0x23, inb(0x23) | 1);  // Mask external interrupts.

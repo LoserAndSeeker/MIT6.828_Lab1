@@ -74,6 +74,7 @@ struct Trapframe {
 	uint16_t tf_padding4;
 } __attribute__((packed));
 
+
 struct UTrapframe {
 	/* information about the fault */
 	uint32_t utf_fault_va;	/* va for T_PGFLT, 0 otherwise */
@@ -85,6 +86,38 @@ struct UTrapframe {
 	/* the trap-time stack to return to */
 	uintptr_t utf_esp;
 } __attribute__((packed));
+
+void divide_handler();
+void debug_handler();
+void nmi_handler();    
+void brkpt_handler(); 
+void oflow_handler();
+void bound_handler();
+void illop_handler();
+void device_handler();
+void dblflt_handler();
+
+void tss_handler();
+void segnp_handler();
+void stack_handler();
+void gpflt_handler();
+void pgflt_handler();
+
+void fperr_handler();
+void align_handler();
+void mchk_handler();
+void simderr_handler();
+void syscall_handler();
+
+
+void irq_error_handler();
+void irq_kbd_handler();
+void irq_ide_handler();
+void irq_timer_handler();
+void irq_spurious_handler();
+void irq_serial_handler();
+
+
 
 #endif /* !__ASSEMBLER__ */
 

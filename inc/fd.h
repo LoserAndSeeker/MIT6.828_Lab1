@@ -33,7 +33,8 @@ struct Fd {
 	int fd_omode;
 	union {
 		// File server files
-		struct FdFile fd_file;
+		// 这应该就是目标文件id，在客户端赋值给了fsipcbuf.read.req_fileid
+		struct FdFile fd_file; 
 	};
 };
 

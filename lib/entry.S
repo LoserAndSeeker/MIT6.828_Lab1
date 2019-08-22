@@ -11,7 +11,7 @@
 	.globl uvpt
 	.set uvpt, UVPT
 	.globl uvpd
-	.set uvpd, (UVPT+(UVPT>>12)*4)
+	.set uvpd, (UVPT+(UVPT>>12)*4) 
 
 
 // Entrypoint - this is where the kernel (or our parent environment)

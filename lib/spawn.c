@@ -19,20 +19,12 @@ static int copy_shared_pages(envid_t child);
 int
 spawn(const char *prog, const char **argv)
 {
-	unsigned char elf_buf[512];
-	struct Trapframe child_tf;
-	envid_t child;
-
-	int fd, i, r;
-	struct Elf *elf;
-	struct Proghdr *ph;
-	int perm;
 
 	// This code follows this procedure:
 	//
 	//   - Open the program file.
 	//
-	//   - Read the ELF header, as you have before, and sanity check its
+	//   - Read the ELF header, as you have before, and sanity check(完整性检查) its
 	//     magic number.  (Check out your load_icode!)
 	//
 	//   - Use sys_exofork() to create a new environment.
@@ -84,8 +76,16 @@ spawn(const char *prog, const char **argv)
 	//     correct initial eip and esp values in the child.
 	//
 	//   - Start the child process running with sys_env_set_status().
+	unsigned char elf_buf[512];
+	struct Trapframe child_tf;
+	envid_t child;
 
-	if ((r = open(prog, O_RDONLY)) < 0)
+	int fd, i, r;
+	struct Elf *elf;
+	struct Proghdr *ph;
+	int perm;
+
+	if ((r = open(prog, O_RDONLY)) < 0)//Open the program file.
 		return r;
 	fd = r;
 
@@ -107,6 +107,7 @@ spawn(const char *prog, const char **argv)
 	child_tf = envs[ENVX(child)].env_tf;
 	child_tf.tf_eip = elf->e_entry;
 
+	// 假设此时argv={"init", "initarg1", "initarg2", NULL}
 	if ((r = init_stack(child, argv, &child_tf.tf_esp)) < 0)
 		return r;
 
@@ -130,7 +131,7 @@ spawn(const char *prog, const char **argv)
 		panic("copy_shared_pages: %e", r);
 
 	child_tf.tf_eflags |= FL_IOPL_3;   // devious: see user/faultio.c
-	if ((r = sys_env_set_trapframe(child, &child_tf)) < 0)
+	if ((r = sys_env_set_trapframe(child, &child_tf)) < 0)//设置好了child_tf后再设到env中
 		panic("sys_env_set_trapframe: %e", r);
 
 	if ((r = sys_env_set_status(child, ENV_RUNNABLE)) < 0)
@@ -147,6 +148,7 @@ error:
 // Spawn, taking command-line arguments array directly on the stack.
 // NOTE: Must have a sentinal of NULL at the end of the args
 // (none of the args may be NULL).
+// 感觉主要将参数放到argv[]数组中，然后调用spawn
 int
 spawnl(const char *prog, const char *arg0, ...)
 {
@@ -155,12 +157,17 @@ spawnl(const char *prog, const char *arg0, ...)
 	// argument will always be NULL, and that none of the other
 	// arguments will be NULL.
 	int argc=0;
+
+	// 假设spawnl("/init", "init", "initarg1", "initarg2", (char*)0)
+	// 我认为va_list就像一个栈，va_start会将arg0后面的字符串一一入栈，而va_arg则是一个出栈的过程
+	// 故va_start之后，vl="initarg1", "initarg2", (char*)0
+	// 在经过while循环后，argc=2,因为我想(char *)0应该就是NULL，vl此时应该空了，va_end它
 	va_list vl;
 	va_start(vl, arg0);
 	while(va_arg(vl, void *) != NULL)
 		argc++;
+	// 因为对参数列表去头去尾，所以本例中argc=2
 	va_end(vl);
-
 	// Now that we have the size of the args, do a second pass
 	// and store the values in a VLA, which has the format of argv
 	const char *argv[argc+2];
@@ -172,6 +179,8 @@ spawnl(const char *prog, const char *arg0, ...)
 	for(i=0;i<argc;i++)
 		argv[i+1] = va_arg(vl, const char *);
 	va_end(vl);
+	// cprintf("the argc in spawnl:%d %s %s %s %s\n",argc, argv[0], argv[1],argv[2],argv[3]);
+	// 所以最后argv={"init", "initarg1", "initarg2", NULL}; argc=2因为去头去尾;
 	return spawn(prog, argv);
 }
 
@@ -194,25 +203,27 @@ init_stack(envid_t child, const char **argv, uintptr_t *init_esp)
 	// Count the number of arguments (argc)
 	// and the total amount of space needed for strings (string_size).
 	string_size = 0;
+
+	// 假设spawnl("/init", "init", "initarg1", "initarg2", (char*)0) 
+	// 故argv={"init", "initarg1", "initarg2", NULL}
+	// 所以以这为例，argc=3, argc+1=4, 只是只加到argv[2]
 	for (argc = 0; argv[argc] != 0; argc++)
 		string_size += strlen(argv[argc]) + 1;
 
 	// Determine where to place the strings and the argv array.
 	// Set up pointers into the temporary page 'UTEMP'; we'll map a page
 	// there later, then remap that page into the child environment
-	// at (USTACKTOP - PGSIZE).
-	// strings is the topmost thing on the stack.
+	// at (USTACKTOP - PGSIZE).为什么要搞得这么麻烦？ 因为是先在父环境设好再直接映射物理页到子环境，不然父环境无法操作子环境内存空间
+	// strings is the topmost(最顶端) thing on the stack.
 	string_store = (char*) UTEMP + PGSIZE - string_size;
 	// argv is below that.  There's one argument pointer per argument, plus
 	// a null pointer.
 	argv_store = (uintptr_t*) (ROUNDDOWN(string_store, 4) - 4 * (argc + 1));
 
-	// Make sure that argv, strings, and the 2 words that hold 'argc'
-	// and 'argv' themselves will all fit in a single stack page.
 	if ((void*) (argv_store - 2) < (void*) UTEMP)
 		return -E_NO_MEM;
 
-	// Allocate the single stack page at UTEMP.
+	// Allocate the single stack page at UTEMP. 现在是在当前环境的UTEMP上设置好，然后再映射到子环境的用户栈上
 	if ((r = sys_page_alloc(0, (void*) UTEMP, PTE_P|PTE_U|PTE_W)) < 0)
 		return r;
 
@@ -234,7 +245,7 @@ init_stack(envid_t child, const char **argv, uintptr_t *init_esp)
 	//	* Set *init_esp to the initial stack pointer for the child,
 	//	  (Again, use an address valid in the child's environment.)
 	for (i = 0; i < argc; i++) {
-		argv_store[i] = UTEMP2USTACK(string_store);
+		argv_store[i] = UTEMP2USTACK(string_store);  // =string_store + USTACKTOP - string_size
 		strcpy(string_store, argv[i]);
 		string_store += strlen(argv[i]) + 1;
 	}
@@ -245,7 +256,18 @@ init_stack(envid_t child, const char **argv, uintptr_t *init_esp)
 	argv_store[-2] = argc;
 
 	*init_esp = UTEMP2USTACK(&argv_store[-2]);
-
+/* 我认为子环境的用户栈应该会被设成这样的：
+	//下面的argv[n]指的是字符串首地址，也是这个栈中对应条目的虚拟地址
+	argv[2] -->	|		"initarg2"	|  <--  USTACKTOP 
+	argv[1] -->	|		"initarg1"	|
+	argv[0] -->	|		"init"		|
+			|		 0(NULL)	|
+			|		 argv[2]	|
+			|		 argv[1]	|
+	addr x -->	|		 argv[0]	|
+			|	  	 addr x		|
+ 	child->esp -->  |		   3		| (往上是出栈)
+*/
 	// After completing the stack, map it into the child's address space
 	// and unmap it from ours!
 	if ((r = sys_page_map(0, UTEMP, child, (void*) (USTACKTOP - PGSIZE), PTE_P | PTE_U | PTE_W)) < 0)
@@ -297,11 +319,20 @@ map_segment(envid_t child, uintptr_t va, size_t memsz,
 	return 0;
 }
 
-// Copy the mappings for shared pages into the child address space.
+// Copy the mappings for shared pages into the child address space.复制到相同的内存空间
 static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
+	int r,i;
+	for (i = 0; i < PGNUM(USTACKTOP); i ++){ 
+		// uvpd、uvpt应该是个全局数组变量，但是数组元素对应的pde、pte具体是什么应该取决于lcr3设置的是哪个环境的内存空间
+		if((uvpd[i/1024] & PTE_P) && (uvpt[i] & PTE_P) && (uvpt[i] & PTE_SHARE)){ //i跟pte一一对应，而i/1024就是该pte所在的页表
+			if ((r = sys_page_map(0, PGADDR(i/1024, i%1024, 0), child,PGADDR(i/1024, i%1024, 0), uvpt[i] & PTE_SYSCALL)) < 0)
+				return r;
+		}
+	}
 	return 0;
+	
 }
 
