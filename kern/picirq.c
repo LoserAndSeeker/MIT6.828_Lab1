@@ -17,19 +17,19 @@ pic_init(void)
 {
 	didinit = 1;
 
-	// mask all interrupts
+	// mask(屏蔽) all interrupts
 	outb(IO_PIC1+1, 0xFF);
 	outb(IO_PIC2+1, 0xFF);
 
-	// Set up master (8259A-1)
+	// Set up master(主要的) (8259A-1)
 
 	// ICW1:  0001g0hi
-	//    g:  0 = edge triggering, 1 = level triggering
-	//    h:  0 = cascaded PICs, 1 = master only
+	//    g:  0 = edge triggering(边缘触发), 1 = level triggering(电平触发)
+	//    h:  0 = cascaded(级联的) PICs, 1 = master only
 	//    i:  0 = no ICW4, 1 = ICW4 required
 	outb(IO_PIC1, 0x11);
 
-	// ICW2:  Vector offset
+	// ICW2:  Vector offset 向量偏移量
 	outb(IO_PIC1+1, IRQ_OFFSET);
 
 	// ICW3:  bit mask of IR lines connected to slave PICs (master PIC),
@@ -37,26 +37,26 @@ pic_init(void)
 	outb(IO_PIC1+1, 1<<IRQ_SLAVE);
 
 	// ICW4:  000nbmap
-	//    n:  1 = special fully nested mode
-	//    b:  1 = buffered mode
-	//    m:  0 = slave PIC, 1 = master PIC
+	//    n:  1 = special fully nested(嵌套) mode
+	//    b:  1 = buffered mode(缓冲模式)
+	//    m:  0 = slave PIC(从属的PIC), 1 = master PIC(主要的PIC)
 	//	  (ignored when b is 0, as the master/slave role
 	//	  can be hardwired).
 	//    a:  1 = Automatic EOI mode
 	//    p:  0 = MCS-80/85 mode, 1 = intel x86 mode
 	outb(IO_PIC1+1, 0x3);
 
-	// Set up slave (8259A-2)
+	// Set up slave(从属的) (8259A-2)
 	outb(IO_PIC2, 0x11);			// ICW1
 	outb(IO_PIC2+1, IRQ_OFFSET + 8);	// ICW2
 	outb(IO_PIC2+1, IRQ_SLAVE);		// ICW3
 	// NB Automatic EOI mode doesn't tend to work on the slave.
-	// Linux source code says it's "to be investigated".
+	// Linux source code says it's "to be investigated(审查)".
 	outb(IO_PIC2+1, 0x01);			// ICW4
 
 	// OCW3:  0ef01prs
 	//   ef:  0x = NOP, 10 = clear specific mask, 11 = set specific mask
-	//    p:  0 = no polling, 1 = polling mode
+	//    p:  0 = no polling, 1 = polling mode(轮询模式)
 	//   rs:  0x = NOP, 10 = read IRR, 11 = read ISR
 	outb(IO_PIC1, 0x68);             /* clear specific mask */
 	outb(IO_PIC1, 0x0a);             /* read IRR by default */

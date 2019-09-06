@@ -10,7 +10,7 @@
 
 // Bytes per file system block - same as page size
 #define BLKSIZE		PGSIZE
-#define BLKBITSIZE	(BLKSIZE * 8)
+#define BLKBITSIZE	(BLKSIZE * 8)  //bitmap block size?
 
 // Maximum size of a filename (a single path component), including null
 // Must be a multiple of 4
@@ -33,11 +33,13 @@ struct File {
 
 	// Block pointers.
 	// A block is allocated iff its value is != 0.
+	// 这里存的是块号还是块的地址？
 	uint32_t f_direct[NDIRECT];	// direct blocks
 	uint32_t f_indirect;		// indirect block
 
 	// Pad out to 256 bytes; must do arithmetic in case we're compiling
 	// fsformat on a 64-bit machine.
+	// 扩展到256字节;必须做算术，以防我们在64位机器上编译fsformat。
 	uint8_t f_pad[256 - MAXNAMELEN - 8 - 4*NDIRECT - 4];
 } __attribute__((packed));	// required only on some 64-bit machines
 
@@ -74,7 +76,7 @@ enum {
 };
 
 union Fsipc {
-	struct Fsreq_open {
+	struct Fsreq_open { //Open req->req_path in mode req->req_omode
 		char req_path[MAXPATHLEN];
 		int req_omode;
 	} open;
@@ -83,10 +85,10 @@ union Fsipc {
 		off_t req_size;
 	} set_size;
 	struct Fsreq_read {
-		int req_fileid;
-		size_t req_n;
+		int req_fileid; //想读取的那个目标文件id
+		size_t req_n;  //Read at most ipc->read.req_n bytes 
 	} read;
-	struct Fsret_read {
+	struct Fsret_read { //Return the bytes read from the file to the caller
 		char ret_buf[PGSIZE];
 	} readRet;
 	struct Fsreq_write {

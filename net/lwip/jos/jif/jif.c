@@ -194,7 +194,7 @@ jif_input(struct netif *netif, void *va)
 	/* update ARP table */
 	etharp_ip_input(netif, p);
 	/* skip Ethernet header */
-	pbuf_header(p, -(int)sizeof(struct eth_hdr));
+	pbuf_header(p, -(int)sizeof(struct eth_hdr)); //去掉以太网头部
 	/* pass to network layer */
 	netif->input(p, netif);
 	break;
@@ -246,7 +246,7 @@ jif_init(struct netif *netif)
     etharp_init();
 
     // qemu user-net is dumb; if the host OS does not send and ARP request
-    // first, the qemu will send packets destined for the host using the mac
+    // first, the qemu will send packets destined(注定的) for the host using the mac
     // addr 00:00:00:00:00; do a arp request for the user-net NAT at 10.0.2.2
     uint32_t ipaddr = inet_addr("10.0.2.2");
     etharp_query(netif, (struct ip_addr *) &ipaddr, 0);

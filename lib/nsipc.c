@@ -119,5 +119,7 @@ nsipc_socket(int domain, int type, int protocol)
 	nsipcbuf.socket.req_domain = domain;
 	nsipcbuf.socket.req_type = type;
 	nsipcbuf.socket.req_protocol = protocol;
+	// nsipc()找一个nsenv，向其发送NSREQ_SOCKET类型的IPC消息
+	// 然后接收其处理结果，返回其返回值
 	return nsipc(NSREQ_SOCKET);
 }

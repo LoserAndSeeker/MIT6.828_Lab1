@@ -95,8 +95,9 @@ connect(int s, const struct sockaddr *name, socklen_t namelen)
 }
 
 int
-listen(int s, int backlog)
+listen(int s, int backlog) 
 {
+//backlog指定在请求队列中的最大请求数，进入的连接请求将在队列中等待 accept() 它们
 	int r;
 	if ((r = fd2sockid(s)) < 0)
 		return r;
@@ -126,7 +127,10 @@ int
 socket(int domain, int type, int protocol)
 {
 	int r;
+	// r是一个sockid
 	if ((r = nsipc_socket(domain, type, protocol)) < 0)
 		return r;
-	return alloc_sockfd(r);
+	return alloc_sockfd(r); 
+	//这里返回的是分配给sockid对应的socket的文件描述符num
+	//这里的socket应该就是相当于文件系统中的OpenFile
 }

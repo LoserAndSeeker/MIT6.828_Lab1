@@ -231,7 +231,7 @@ serve_thread(uint32_t a) {
 				req->socket.req_protocol);
 		break;
 	case NSREQ_INPUT:
-		jif_input(&nif, (void *)&req->pkt);
+		jif_input(&nif, (void *)&req->pkt); //用网络接口nif处理pkt数据包
 		r = 0;
 		break;
 	default:
@@ -263,8 +263,8 @@ serve(void) {
 
 	while (1) {
 		// ipc_recv will block the entire process, so we flush
-		// all pending work from other threads.  We limit the
-		// number of yields in case there's a rogue thread.
+		// all pending(未处理的) work from other threads.  We limit the
+		// number of yields in case there's a rogue(闲置淘气) thread.
 		for (i = 0; thread_wakeups_pending() && i < 32; ++i)
 			thread_yield();
 

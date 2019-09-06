@@ -39,8 +39,8 @@ umain(int argc, char **argv)
 		cprintf("init: bss seems okay\n");
 
 	// output in one syscall per line to avoid output interleaving 
-	strcat(args, "init: args:");
-	for (i = 0; i < argc; i++) {
+	strcat(args, "init: args:"); //字符串连接，args = args + "init:args:" 
+	for (i = 0; i < argc; i++) { //argc、argv在spawn中存入该环境用户栈中，此时*esp=argc=3
 		strcat(args, " '");
 		strcat(args, argv[i]);
 		strcat(args, "'");

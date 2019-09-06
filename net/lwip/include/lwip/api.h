@@ -126,7 +126,7 @@ struct netconn {
   /** mbox where new connections are stored until processed
       by the application thread */
   sys_mbox_t acceptmbox;
-  /** only used for socket layer */
+  /** only used for socket layer(套接字层) */
   int socket;
 #if LWIP_SO_RCVTIMEO
   /** timeout to wait for new data to be received

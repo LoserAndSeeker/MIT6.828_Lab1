@@ -11,10 +11,10 @@ static void
 announce(void)
 {
 	// We need to pre-announce our IP so we don't have to deal
-	// with ARP requests.  Ideally, we would use gratuitous ARP
-	// for this, but QEMU's ARP implementation is dumb and only
+	// with ARP requests.  Ideally, we would use gratuitous(无端的，无理由的) ARP
+	// for this, but QEMU's ARP implementation is dumb(呆傻) and only
 	// listens for very specific ARP requests, such as requests
-	// for the gateway IP.
+	// for the gateway(网关) IP.
 
 	uint8_t mac[6] = {0x52, 0x54, 0x00, 0x12, 0x34, 0x56};
 	uint32_t myip = inet_addr(IP);

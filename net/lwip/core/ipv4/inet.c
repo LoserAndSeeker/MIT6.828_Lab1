@@ -58,7 +58,7 @@
  * @return ip address in network order
  */
 u32_t
-inet_addr(const char *cp)
+inet_addr(const char *cp) //将点分十进制字符串转成网络字节序(大端序)的32位整数型数据
 {
   struct in_addr val;
 
@@ -70,18 +70,19 @@ inet_addr(const char *cp)
 
 /**
  * Check whether "cp" is a valid ascii representation
- * of an Internet address and convert to a binary address.
+ * of an Internet address and convert(转化) to a binary address.
  * Returns 1 if the address is valid, 0 if not.
  * This replaces inet_addr, the return value from which
  * cannot distinguish between failure and a local broadcast address.
  *
- * @param cp IP address in ascii represenation (e.g. "127.0.0.1")
+ * @param(参数) cp IP address in ascii represenation (e.g. "127.0.0.1")
  * @param addr pointer to which to save the ip address in network order
  * @return 1 if cp could be converted to addr, 0 on failure
  */
 int
-inet_aton(const char *cp, struct in_addr *addr)
+inet_aton(const char *cp, struct in_addr *addr) 
 {
+//将ACSII格式的cp IP变为二进制地址存到addr->s_addr
   u32_t val;
   int base, n, c;
   u32_t parts[4];
@@ -182,6 +183,7 @@ inet_aton(const char *cp, struct in_addr *addr)
 char *
 inet_ntoa(struct in_addr addr)
 {
+// 将数字IP地址转化成十进制带点ASCII表示,作为返回值
   static char str[16];
   u32_t s_addr = addr.s_addr;
   char inv[3];
@@ -231,7 +233,7 @@ inet_ntoa(struct in_addr addr)
  * @return n in network byte order
  */
 u16_t
-htons(u16_t n)
+htons(u16_t n)//h代表host字节序(看CPU，一般主机为小端序)，n代表network字节序(统一为大端序)
 {
   return ((n & 0xff) << 8) | ((n & 0xff00) >> 8);
 }

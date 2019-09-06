@@ -1,7 +1,7 @@
 /*	$NetBSD: pcireg.h,v 1.45 2004/02/04 06:58:24 soren Exp $	*/
 
 /*
- * Copyright (c) 1995, 1996, 1999, 2000
+ * Copyright(版权) (c) 1995, 1996, 1999, 2000
  *     Christopher G. Demetriou.  All rights reserved.
  * Copyright (c) 1994, 1996 Charles M. Hannum.  All rights reserved.
  *
@@ -10,6 +10,7 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
+ *    (源代码的重新发布必须保留上述版权声明、本条件列表和下列免责声明)
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
@@ -29,6 +30,7 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 整个这上面都是版权申明！
  */
 
 #ifndef _DEV_PCI_PCIREG_H_
@@ -43,13 +45,15 @@
 #include <inc/types.h>
 
 /*
- * Device identification register; contains a vendor ID and a device ID.
+ * Device identification(鉴定，识别) register; contains a vendor ID and a device ID.
  */
 #define	PCI_ID_REG			0x00
 
 typedef uint16_t pci_vendor_id_t;
 typedef uint16_t pci_product_id_t;
 
+#define	PCI_VENDOR_ID				0x8086
+#define	PCI_DEVICE_ID				0x100E
 #define	PCI_VENDOR_SHIFT			0
 #define	PCI_VENDOR_MASK				0xffff
 #define	PCI_VENDOR(id) \
@@ -104,7 +108,7 @@ typedef uint16_t pci_product_id_t;
 #define	PCI_STATUS_PARITY_DETECT		0x80000000
 
 /*
- * PCI Class and Revision Register; defines type and revision of device.
+ * PCI Class and Revision(修订) Register; defines type and revision of device.
  */
 #define	PCI_CLASS_REG			0x08
 
@@ -159,7 +163,7 @@ typedef uint8_t pci_revision_t;
 #define	PCI_CLASS_DASP				0x11
 #define	PCI_CLASS_UNDEFINED			0xff
 
-/* 0x00 prehistoric subclasses */
+/* 0x00 prehistoric subclasses(史前的子类？) */
 #define	PCI_SUBCLASS_PREHISTORIC_MISC		0x00
 #define	PCI_SUBCLASS_PREHISTORIC_VGA		0x01
 
@@ -297,7 +301,7 @@ typedef uint8_t pci_revision_t;
 #define	PCI_SUBCLASS_DASP_MISC			0x80
 
 /*
- * PCI BIST/Header Type/Latency Timer/Cache Line Size Register.
+ * PCI BIST/Header Type/Latency Timer(延迟定时器)/Cache Line Size Register.
  */
 #define	PCI_BHLC_REG			0x0c
 

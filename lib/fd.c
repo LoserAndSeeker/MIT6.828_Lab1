@@ -37,7 +37,7 @@ fd2data(struct Fd *fd)
 // Sets *fd_store to the corresponding fd page virtual address.
 //
 // fd_alloc does NOT actually allocate an fd page.
-// It is up to the caller to allocate the page somehow.
+// It is up to the caller to allocate the page somehow.不会实际分配fd页面，因为只要映射到open file的Fd page就行
 // This means that if someone calls fd_alloc twice in a row
 // without allocating the first page we return, we'll return the same
 // page the second time.
@@ -170,7 +170,7 @@ close_all(void)
 // For instance, writing onto either file descriptor will affect the
 // file and the file offset of the other.
 // Closes any previously open file descriptor at 'newfdnum'.
-// This is implemented using virtual memory tricks (of course!).
+// This is implemented using virtual memory tricks(技巧) (of course!).
 int
 dup(int oldfdnum, int newfdnum)
 {

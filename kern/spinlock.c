@@ -11,7 +11,7 @@
 
 // The big kernel lock
 struct spinlock kernel_lock = {
-#ifdef DEBUG_SPINLOCK
+#ifdef DEBUG_SPINLOCK	//如果宏定义了DEBUG_SPINLOCK，就执行中间的程序
 	.name = "kernel_lock"
 #endif
 };
@@ -66,7 +66,7 @@ spin_lock(struct spinlock *lk)
 #endif
 
 	// The xchg is atomic.
-	// It also serializes, so that reads after acquire are not
+	// It also serializes(序列化的), so that reads after acquire are not
 	// reordered before it. 
 	while (xchg(&lk->locked, 1) != 0)
 		asm volatile ("pause");

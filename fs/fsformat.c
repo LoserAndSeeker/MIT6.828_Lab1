@@ -106,9 +106,9 @@ opendisk(const char *name)
 
 	close(diskfd);
 
-	diskpos = diskmap;
-	alloc(BLKSIZE);
-	super = alloc(BLKSIZE);
+	diskpos = diskmap; //diskmap is 0x10000000
+	alloc(BLKSIZE);	//leave block 0 for boot loader
+	super = alloc(BLKSIZE); //block 1 for superblocks
 	super->s_magic = FS_MAGIC;
 	super->s_nblocks = nblocks;
 	super->s_root.f_type = FTYPE_DIR;

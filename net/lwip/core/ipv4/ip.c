@@ -172,6 +172,8 @@ ip_forward(struct pbuf *p, struct ip_hdr *iphdr, struct netif *inp)
  * @return ERR_OK if the packet was processed (could return ERR_* if it wasn't
  *         processed, but currently always returns ERR_OK)
  */
+
+// 对IP数据包进行基础检查，包括大小、checksum等，通过检查的发送包更上一层的协议input函数
 err_t
 ip_input(struct pbuf *p, struct netif *inp)
 {
@@ -369,7 +371,7 @@ ip_input(struct pbuf *p, struct netif *inp)
 
 #if LWIP_IGMP
   /* there is an extra "router alert" option in IGMP messages which we allow for but do not police */
-  if((iphdr_hlen > IP_HLEN &&  (IPH_PROTO(iphdr) != IP_PROTO_IGMP)) {
+  if((iphdr_hlen > IP_HLEN &&  (IPH_PROTO(iphdr) != IP_PROTO_IGMP))) {
 #else
   if (iphdr_hlen > IP_HLEN) {
 #endif /* LWIP_IGMP */

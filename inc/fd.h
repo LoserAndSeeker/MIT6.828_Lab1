@@ -36,10 +36,13 @@ struct Fd {
 	off_t fd_offset;
 	int fd_omode;
 	union {
-		// File server files
-		struct FdFile fd_file;
 		// Network sockets
 		struct FdSock fd_sock;
+
+		// File server files
+		// 这应该就是目标文件id，在客户端赋值给了fsipcbuf.read.req_fileid
+		struct FdFile fd_file; 
+
 	};
 };
 

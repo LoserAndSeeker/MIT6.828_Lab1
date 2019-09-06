@@ -81,31 +81,64 @@ extern "C" {
 /** if set, the netif has IGMP capability */
 #define NETIF_FLAG_IGMP         0x40U
 
+/*链路层：
+1.网卡地址就是数据包的发送地址和接收地址，也就是帧首部所包含的MAC地址
+2.链路层的主要工作就是对电信号进行分组并形成具有特定意义的数据帧，然后以广播的形式通过物理介质发送给接收方。
+*/
+
+/**网络层引入三个协议
+IP协议：用于判断两台主机是否属于同一个子网
+	以C类地址192.168.24.1为例，其中前24位就是网络地址，后8位就是主机地址。每一个10进制数是8位(0~255)
+	发送者和接收者的IP地址是已知的(应用层的协议会传入)， 因此我们只要通过子网掩码对两个IP地址进行AND运算后就能够判断双方是否在同一个子网
+ARP协议：(同一子网下)ARP 协议的基本功能是使用目标主机的 IP 地址，查询其对应的 MAC 地址，以保证底层链路上数据包通信的进行。
+	功能流程：先查询ARP表，如果表中有目标IP地址，就直接得到目标MAC地址
+	如果没有，就发送一个广播(ARP请求，目的地址0xFFFFFFFFFFFF)，请求同一网段内所有主机都会收到一条询问信息：“目标IP的MAC地址是多少”
+路由协议：使ARP的MAC寻址不再局限在同一子网中。
+	在同一个子网，就通过ARP协议查询对应的MAC地址，然后以广播的形式向该子网内的主机发送数据包；
+	如果不在同一个子网，以太网会将该数据包转发给本子网的网关进行路由。网关是互联网上子网与子网之间的桥梁，所以网关会进行多次转发，
+	最终将该数据包转发到目标IP所在的子网中，然后再通过ARP获取目标机MAC，最终也是通过广播形式将数据包发送给接收方
+网络层的主要工作是定义网络地址，区分网段，子网内MAC寻址，对于不同子网的数据包进行路由。
+*/
+
+/*传输层
+链路层定义了主机的身份，即MAC地址， 而网络层定义了IP地址，明确了主机所在的网段，有了这两个地址，数据包就从可以从一个主机发送到另一台主机。
+但实际上数据包是从一个主机的某个应用程序发出，然后由对方主机的应用程序接收。当数据包被发送到主机上以后，是传输层主要决定哪个应用程序要接收这个包
+传输层的主要工作是定义端口，标识应用程序身份，实现端口到端口的通信。UCP只发包不建立连接，而TCP协议可以保证数据传输的可靠性(三次对话的确认机制)
+*/
+
+/*应用层
+有了以上三层协议的支持，数据已经可以从一个主机上的应用程序传输到另一台主机的应用程序了，但此时传过来的数据是字节流，不能很好的被程序识别，操作性差。
+因此，应用层定义了各种各样的协议来规范数据格式，常见的有 HTTP、FTP、SMTP 等
+应用层的主要工作就是定义数据格式并按照对应的格式解读数据
+*/
+
 /** Generic data structure used for all lwIP network interfaces.
  *  The following fields should be filled in by the initialization
  *  function for the device driver: hwaddr_len, hwaddr[], mtu, flags */
 
-struct netif {
+struct netif { //network interfaces
   /** pointer to next in linked list */
   struct netif *next;
 
   /** IP address configuration in network byte order */
-  struct ip_addr ip_addr;
-  struct ip_addr netmask;
-  struct ip_addr gw;
+  //IP地址和子网掩码通过按位与运算后就可以得到网络地址
+  struct ip_addr ip_addr; //网络接口的IP地址
+  struct ip_addr netmask; //子网掩码
+  struct ip_addr gw;	  //网关地址
 
   /** This function is called by the network device driver
    *  to pass a packet up the TCP/IP stack. */
-  err_t (* input)(struct pbuf *p, struct netif *inp);
-  /** This function is called by the IP module when it wants
+  err_t (* input)(struct pbuf *p, struct netif *inp); //在lwip_init里赋值ip_input
+  /** This function is called by the IP module(模块) when it wants
    *  to send a packet on the interface. This function typically
-   *  first resolves the hardware address, then sends the packet. */
+   *  first resolves(解析) the hardware address, then sends the packet. */
   err_t (* output)(struct netif *netif, struct pbuf *p,
-       struct ip_addr *ipaddr);
-  /** This function is called by the ARP module when it wants
+       struct ip_addr *ipaddr); //在jif_init里初始化成jif_output
+  /** Address Resolution Protocol
+   *  This function is called by the ARP module when it wants
    *  to send a packet on the interface. This function outputs
    *  the pbuf as-is on the link medium. */
-  err_t (* linkoutput)(struct netif *netif, struct pbuf *p);
+  err_t (* linkoutput)(struct netif *netif, struct pbuf *p);//在jif_init里赋值low_level_output
 #if LWIP_NETIF_STATUS_CALLBACK
   /** This function is called when the netif state is set to up or down
    */
@@ -118,7 +151,7 @@ struct netif {
 #endif /* LWIP_NETIF_LINK_CALLBACK */
   /** This field can be set by the device driver and could point
    *  to state information for the device. */
-  void *state;
+  void *state; //设备状态信息，由驱动程序设置
 #if LWIP_DHCP
   /** the DHCP client state information for this netif */
   struct dhcp *dhcp;

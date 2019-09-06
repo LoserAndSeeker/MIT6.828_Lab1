@@ -219,21 +219,21 @@ static void
 ethernetif_input(struct netif *netif)
 {
   struct ethernetif *ethernetif;
-  struct eth_hdr *ethhdr;
-  struct pbuf *p;
+  struct eth_hdr *ethhdr; //以太网头部结构指针
+  struct pbuf *p; 
 
   ethernetif = netif->state;
 
   /* move received packet into a new pbuf */
-  p = low_level_input(netif);
+  p = low_level_input(netif); //调用底层函数读取一个数据包
   /* no packet could be read, silently ignore this */
   if (p == NULL) return;
   /* points to packet payload, which starts with an Ethernet header */
-  ethhdr = p->payload;
+  ethhdr = p->payload; //将ethhdr指向数据包中以太网头部
 
   switch (htons(ethhdr->type)) {
   /* IP or ARP packet? */
-  case ETHTYPE_IP:
+  case ETHTYPE_IP:  //IP包和ARP包都调用注册的netif->input函数应该是ip_input()
   case ETHTYPE_ARP:
 #if PPPOE_SUPPORT
   /* PPPoE packet? */

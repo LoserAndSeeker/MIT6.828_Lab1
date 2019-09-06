@@ -23,7 +23,7 @@ runcmd(char* s)
 {
 	char *argv[MAXARGS], *t, argv0buf[BUFSIZ];
 	int argc, c, i, r, p[2], fd, pipe_child;
-
+	//cprintf("first of s:%s\n",s);
 	pipe_child = 0;
 	gettoken(s, 0);
 
@@ -55,7 +55,15 @@ again:
 			// then close the original 'fd'.
 
 			// LAB 5: Your code here.
-			panic("< redirection not implemented");
+			if ((fd = open(t, O_RDONLY)) < 0) {
+				cprintf("open %s for read: %e", t, fd);
+				exit();
+			}
+			if (fd != 0) {
+				dup(fd, 0); //应该是让文件描述符0也作为fd对应的那个open file的struct Fd页面
+				close(fd);
+			}
+			//panic("< redirection not implemented");
 			break;
 
 		case '>':	// Output redirection
@@ -113,6 +121,7 @@ again:
 			break;
 
 		}
+		//cprintf("next of s:%s %d\n",t, argc);
 	}
 
 runit:
@@ -172,8 +181,8 @@ runit:
 }
 
 
-// Get the next token from string s.
-// Set *p1 to the beginning of the token and *p2 just past the token.
+// Get the next token(命令) from string s.
+// Set *p1 to the beginning of the token and *p2 just past(跳过) the token.
 // Returns
 //	0 for end-of-string;
 //	< for <;
@@ -236,12 +245,17 @@ int
 gettoken(char *s, char **p1)
 {
 	static int c, nc;
-	static char* np1, *np2;
+	static char* np1, *np2; //最秀的就是这几个静态变量
 
+	// np1指向s中第一个token的开始，s、np2都指向刚跳过这个token后的开始
+	// token里没有空格，可以是"cat" "num"等字符串，也可以是"<" "|"等符号
+	// gettoken(s,0)主要是为了设置好np1跟np2
 	if (s) {
 		nc = _gettoken(s, &np1, &np2);
 		return 0;
 	}
+	
+	//gettoken(0, &t)就不会进上面了，先把前一个np1给p1，再更新np1跟np2
 	c = nc;
 	*p1 = np1;
 	nc = _gettoken(np2, &np1, &np2);
@@ -265,7 +279,7 @@ umain(int argc, char **argv)
 	interactive = '?';
 	echocmds = 0;
 	argstart(&argc, argv, &args);
-	while ((r = argnext(&args)) >= 0)
+	while ((r = argnext(&args)) >= 0) //每次r应该是argv[1]的首字母,这里直接r=-1?
 		switch (r) {
 		case 'd':
 			debug++;

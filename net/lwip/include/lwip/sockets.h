@@ -46,18 +46,19 @@ extern "C" {
 #endif
 
 /* members are in network byte order */
-struct sockaddr_in {
+struct sockaddr_in   //用于表示ipv4地址的结构体
   u8_t sin_len;
-  u8_t sin_family;
-  u16_t sin_port;
-  struct in_addr sin_addr;
-  char sin_zero[8];
+  u8_t sin_family;  //地址簇
+  u16_t sin_port;  //端口号两个字节 
+  struct in_addr sin_addr; //32位IP地址，占4个字节
+  char sin_zero[8];  //不使用,为了使sockaddr_in与sockaddr保持一致
 };
 
-struct sockaddr {
+// 直接想sockaddr填充信息会有麻烦，先往sockaddr_in里填再转换成sockaddr作为bind()的参数就很合适
+struct sockaddr { 
   u8_t sa_len;
   u8_t sa_family;
-  char sa_data[14];
+  char sa_data[14];//这里跟上面对应，保存着端口号跟IP地址，剩下的8个字节为0
 };
 
 #ifndef socklen_t

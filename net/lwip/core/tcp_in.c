@@ -83,7 +83,7 @@ static err_t tcp_timewait_input(struct tcp_pcb *pcb);
 /**
  * The initial input processing of TCP. It verifies the TCP header, demultiplexes
  * the segment between the PCBs and passes it on to tcp_process(), which implements
- * the TCP finite state machine. This function is called by the IP layer (in
+ * the TCP finite state machine(TCP有限状态机). This function is called by the IP layer (in
  * ip_input()).
  *
  * @param p received TCP segment to process (p->payload pointing to the IP header)
@@ -92,7 +92,7 @@ static err_t tcp_timewait_input(struct tcp_pcb *pcb);
 void
 tcp_input(struct pbuf *p, struct netif *inp)
 {
-  struct tcp_pcb *pcb, *prev;
+  struct tcp_pcb *pcb, *prev; //tcp协议控制块
   struct tcp_pcb_listen *lpcb;
   u8_t hdrlen;
   err_t err;

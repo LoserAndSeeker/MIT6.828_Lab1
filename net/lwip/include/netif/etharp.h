@@ -71,13 +71,13 @@ PACK_STRUCT_END
 #ifdef PACK_STRUCT_USE_INCLUDES
 #  include "arch/bpstruct.h"
 #endif
-PACK_STRUCT_BEGIN
+PACK_STRUCT_BEGIN //不会被gcc自动补全？
 struct eth_hdr {
 #if ETH_PAD_SIZE
   PACK_STRUCT_FIELD(u8_t padding[ETH_PAD_SIZE]);
 #endif
-  PACK_STRUCT_FIELD(struct eth_addr dest);
-  PACK_STRUCT_FIELD(struct eth_addr src);
+  PACK_STRUCT_FIELD(struct eth_addr dest); //目的以太网MAC地址
+  PACK_STRUCT_FIELD(struct eth_addr src);  // 源以太网MAC地址
   PACK_STRUCT_FIELD(u16_t type);
 } PACK_STRUCT_STRUCT;
 PACK_STRUCT_END
@@ -91,7 +91,7 @@ PACK_STRUCT_END
 PACK_STRUCT_BEGIN
 /** the ARP message */
 struct etharp_hdr {
-  PACK_STRUCT_FIELD(struct eth_hdr ethhdr);
+  PACK_STRUCT_FIELD(struct eth_hdr ethhdr); //以太网头部
   PACK_STRUCT_FIELD(u16_t hwtype);
   PACK_STRUCT_FIELD(u16_t proto);
   PACK_STRUCT_FIELD(u16_t _hwlen_protolen);

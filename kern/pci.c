@@ -5,9 +5,18 @@
 #include <kern/pcireg.h>
 #include <kern/e1000.h>
 
+//在MMIO中为E1000的BAR 0创建的虚拟内存映射的位置
+//volatile uint32_t *pci_e1000;
+
 // Flag to do "lspci" at bootup
 static int pci_show_devs = 1;
 static int pci_show_addrs = 0;
+
+/*下面这里很好的解释了为什么要有bridge：
+x86的CPU只有内存和I/O两种空间，没有专用的配置空间，PCI协议规定利用特定的I/O空间操作驱动PCI桥路转换成配置空间的操作。
+使用了两个特定的32位I/O空间，即CF8h和CFCh。这两个空间对应于PCI桥路的两个寄存器，
+当桥路看到CPU在局部总线对这两个I/O空间进行双字 操作时，就将该I/O操作转变为PCI总线的配置操作。
+寄存器CF8h用于产生配置空间的地址（CONFIG-ADDRESS），寄存器CFCh用于保存 配置空间的读写数据（CONFIG-DATA）。*/
 
 // PCI "configuration mechanism one"
 static uint32_t pci_conf1_addr_ioport = 0x0cf8;
@@ -15,6 +24,7 @@ static uint32_t pci_conf1_data_ioport = 0x0cfc;
 
 // Forward declarations
 static int pci_bridge_attach(struct pci_func *pcif);
+//static int e1000_init(struct pci_func *pcif); //这一行是自己加的！
 
 // PCI driver table
 struct pci_driver {
@@ -31,6 +41,7 @@ struct pci_driver pci_attach_class[] = {
 // pci_attach_vendor matches the vendor ID and device ID of a PCI device. key1
 // and key2 should be the vendor ID and device ID respectively
 struct pci_driver pci_attach_vendor[] = {
+	{ PCI_VENDOR_ID, PCI_DEVICE_ID, &e1000_init },
 	{ 0, 0, 0 },
 };
 
@@ -40,13 +51,13 @@ pci_conf1_set_addr(uint32_t bus,
 		   uint32_t func,
 		   uint32_t offset)
 {
-	assert(bus < 256);
-	assert(dev < 32);
-	assert(func < 8);
-	assert(offset < 256);
-	assert((offset & 0x3) == 0);
+	assert(bus < 256);	//8位 最多可以有256根PCI总线，一般主机上只会用到其中很少的几根
+	assert(dev < 32);	//5位 一根PCI总线可以连接多个物理设备，可以是一个网卡、显卡或声卡等，最多不超过32个
+	assert(func < 8);	//3位 一个PCI物理设备可以有多个功能，比如同时提供视频解析和声音解析，最多可提供8个功能。
+	assert(offset < 256);	//8位 每个功能对应1个256字节的PCI配置空间。
+	assert((offset & 0x3) == 0);//最后两位必须为00？
 
-	uint32_t v = (1 << 31) |		// config-space
+	uint32_t v = (1 << 31) |		// 由总线号、设备号、功能号和寄存器号组成config-space地址
 		(bus << 16) | (dev << 11) | (func << 8) | (offset);
 	outl(pci_conf1_addr_ioport, v);
 }
@@ -54,8 +65,8 @@ pci_conf1_set_addr(uint32_t bus,
 static uint32_t
 pci_conf_read(struct pci_func *f, uint32_t off)
 {
-	pci_conf1_set_addr(f->bus->busno, f->dev, f->func, off);
-	return inl(pci_conf1_data_ioport);
+	pci_conf1_set_addr(f->bus->busno, f->dev, f->func, off); //先为pci_conf1_addr_ioport设置好config-space
+	return inl(pci_conf1_data_ioport); //返回的是从这个端口读到的数据
 }
 
 static void
@@ -130,15 +141,15 @@ pci_scan_bus(struct pci_bus *bus)
 	memset(&df, 0, sizeof(df));
 	df.bus = bus;
 
-	for (df.dev = 0; df.dev < 32; df.dev++) {
-		uint32_t bhlc = pci_conf_read(&df, PCI_BHLC_REG);
+	for (df.dev = 0; df.dev < 32; df.dev++) { //每跟bus上最多有32个dev
+		uint32_t bhlc = pci_conf_read(&df, PCI_BHLC_REG); //参数是pci_func、off，返回值是读到的配置信息data
 		if (PCI_HDRTYPE_TYPE(bhlc) > 1)	    // Unsupported or no device
 			continue;
 
 		totaldev++;
 
 		struct pci_func f = df;
-		for (f.func = 0; f.func < (PCI_HDRTYPE_MULTIFN(bhlc) ? 8 : 1);
+		for (f.func = 0; f.func < (PCI_HDRTYPE_MULTIFN(bhlc) ? 8 : 1); //每个dev上最多有8个func
 		     f.func++) {
 			struct pci_func af = f;
 

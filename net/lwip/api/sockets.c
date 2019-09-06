@@ -426,7 +426,7 @@ lwip_connect(int s, const struct sockaddr *name, socklen_t namelen)
  * @return 0 on success, non-zero on failure
  */
 int
-lwip_listen(int s, int backlog)
+lwip_listen(int s, int backlog)	//设置一个socket为listen模式
 {
   struct lwip_socket *sock;
   err_t err;
@@ -438,7 +438,7 @@ lwip_listen(int s, int backlog)
     return -1;
 
   /* limit the "backlog" parameter to fit in an u8_t */
-  if (backlog < 0) {
+  if (backlog < 0) { //backlog 积压的工作
     backlog = 0;
   }
   if (backlog > 0xff) {

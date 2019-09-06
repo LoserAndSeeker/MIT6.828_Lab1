@@ -11,21 +11,21 @@
 # IPI from the boot CPU.  Section B.4.2 of the Multi-Processor
 # Specification says that the AP will start in real mode with CS:IP
 # set to XY00:0000, where XY is an 8-bit value sent with the
-# STARTUP. Thus this code must start at a 4096-byte boundary.
+# STARTUP. Thus this code must start at a 4096-byte boundary.为什么？？？
 #
 # Because this code sets DS to zero, it must run from an address in
 # the low 2^16 bytes of physical memory.
 #
 # boot_aps() (in init.c) copies this code to MPENTRY_PADDR (which
 # satisfies the above restrictions).  Then, for each AP, it stores the
-# address of the pre-allocated per-core stack in mpentry_kstack, sends
+# address of the pre-allocated(预分配) per-core stack(每个内核堆栈) in mpentry_kstack, sends
 # the STARTUP IPI, and waits for this code to acknowledge that it has
 # started (which happens in mp_main in init.c).
 #
 # This code is similar to boot/boot.S except that
 #    - it does not need to enable A20
-#    - it uses MPBOOTPHYS to calculate absolute addresses of its
-#      symbols, rather than relying on the linker to fill them
+#    - it uses MPBOOTPHYS to calculate absolute addresses(计算绝对地址) of its
+#      symbols, rather than relying on the linker(链接器) to fill them
 
 #define RELOC(x) ((x) - KERNBASE)
 #define MPBOOTPHYS(s) ((s) - mpentry_start + MPENTRY_PADDR)
@@ -36,22 +36,30 @@
 .code16           
 .globl mpentry_start
 mpentry_start:
-	cli            
+	cli           			 # Disable interrupts
 
+	# Set up the important data segment registers (DS, ES, SS).
 	xorw    %ax, %ax
 	movw    %ax, %ds
 	movw    %ax, %es
 	movw    %ax, %ss
 
+  # Switch from real to protected mode, using a bootstrap GDT
+  # and segment translation that makes virtual addresses 
+  # identical to their physical addresses, so that the 
+  # effective memory map does not change during the switch.
 	lgdt    MPBOOTPHYS(gdtdesc)
 	movl    %cr0, %eax
 	orl     $CR0_PE, %eax
 	movl    %eax, %cr0
 
+  # Jump to next instruction, but in 32-bit code segment.
+  # Switches processor into 32-bit mode.
 	ljmpl   $(PROT_MODE_CSEG), $(MPBOOTPHYS(start32))
 
 .code32
 start32:
+	 # Set up the protected-mode data segment registers
 	movw    $(PROT_MODE_DSEG), %ax
 	movw    %ax, %ds
 	movw    %ax, %es
@@ -70,7 +78,7 @@ start32:
 	movl    %eax, %cr0
 
 	# Switch to the per-cpu stack allocated in boot_aps()
-	movl    mpentry_kstack, %esp
+	movl    mpentry_kstack, %esp    #为什么每次都是从mpentry_kstack开始？因为mp_main()中每一次mpentry_kstack都赋了新值
 	movl    $0x0, %ebp       # nuke frame pointer
 
 	# Call mp_main().  (Exercise for the reader: why the indirect call?)
